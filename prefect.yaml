@@ -1,0 +1,47 @@
+---
+# Welcome to your prefect.yaml file! You can use this file for
+# storing and managing configuration for deploying your flows.
+# We recommend committing this file to source control along
+# with your flow code.
+
+# Generic metadata about this project
+name: finance_analytics
+prefect-version: 3.7.2
+
+# build section allows you to manage and build docker images
+build: null
+
+# push section allows you to manage if and how this project
+# is uploaded to remote locations
+push: null
+
+# pull section allows you to provide instructions for cloning
+# this project in remote locations
+pull:
+  - prefect.deployments.steps.set_working_directory:
+      directory: /opt/finance_analytics
+
+# the deployments section allows you to provide configuration
+# for deploying flows
+deployments:
+  - name: money-flow-ingestion
+    version: null
+    tags:
+      - ingestion
+      - s3
+      - money-flow
+    concurrency_limit:
+      limit: 1
+      collision_strategy: CANCEL_NEW
+    description: >
+      Monitors S3 bucket for new Money Flow exports,
+      loads new files into raw.money_flow and runs dbt build
+      when new data is detected.
+    entrypoint: orchestration/flows/money_flow_s3_ingestion_flow.py:money_flow_s3_ingestion_flow
+    parameters: {}
+    work_pool:
+      name: finance-process-pool
+      work_queue_name: null
+      job_variables: {}
+    schedules:
+      - interval: 300

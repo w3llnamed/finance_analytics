@@ -1,0 +1,72 @@
+# dbt/dbt_project.yml
+
+name: finance_analytics
+
+version: "1.0.0"
+config-version: 2
+
+profile: finance_analytics
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+snapshot-paths: ["snapshots"]
+macro-paths: ["macros"]
+
+target-path: "target"
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  finance_analytics:
+    +persist_docs:
+      relation: true
+      columns: true
+
+    01_stg:
+      +schema: stg
+      +materialized: view
+
+    02_core:
+      +schema: core
+      +materialized: table
+
+    03_dm:
+      +schema: dm
+      +materialized: table
+
+    04_dm_demo:
+      +schema: dm_demo
+      +materialized: table
+
+    90_infra:
+      +schema: infra
+      +materialized: table
+
+data_tests:
+  finance_analytics:
+    01_stg:
+      +severity: warn
+
+    02_core:
+      +severity: error
+
+    03_dm:
+      +severity: warn
+
+    04_dm_demo:
+      +severity: warn
+
+    90_infra:
+      +severity: warn
+
+seeds:
+  finance_analytics:
+    +schema: seed
+
+on-run-end:
+  - "{{ log_test_results_to_infra() }}"
+  - "{{ log_model_runs_to_infra() }}"

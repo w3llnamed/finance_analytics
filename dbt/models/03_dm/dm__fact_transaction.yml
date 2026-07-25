@@ -1,0 +1,54 @@
+version: 2
+
+models:
+  - name: dm__fact_transaction
+    description: >
+      Analytical mart with transaction-level flags for regular and reserve expenses
+      based on active tags from seed dictionaries.
+
+    columns:
+      - name: transaction_date
+        description: >
+          Transaction date and time.
+        tests:
+          - not_null
+
+      - name: account
+        description: >
+          Account associated with the transaction.
+
+      - name: amount
+        description: >
+          Transaction amount divided by.
+
+      - name: amount_abs
+        description: >
+          Absolute transaction amount.
+
+      - name: parent_category
+        description: >
+          Parent category of the transaction.
+
+      - name: category
+        description: >
+          Detailed category of the transaction.
+
+      - name: tags
+        description: >
+          Comma-separated transaction tags.
+
+      - name: note
+        description: >
+          Transaction note.
+
+      - name: transaction_type
+        description: >
+          Transaction type.
+
+      - name: expense_type
+        description: >
+          Type of expense based in flags `is_reserve` and `is_regular`.
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['Regular', 'Reserve', 'Discretionary']

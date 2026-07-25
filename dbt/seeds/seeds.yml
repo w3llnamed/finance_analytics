@@ -1,0 +1,202 @@
+# seeds/seeds.yml
+version: 2
+
+seeds:
+  - name: regular_expense_tag
+    description: >
+      Defines the tag that marks recurring expenses.
+      Exactly one active record must exist.
+      This constraint is validated by a singular dbt test.
+    config:
+      column_types:
+        tag: varchar(50)
+        is_active: boolean
+
+    columns:
+      - name: tag
+        data_tests:
+          - not_null
+          - unique
+          - active_seed_tags_exist_in_raw_tags:
+              config:
+                severity: warn
+              arguments:
+                raw_source_name: raw
+                raw_table_name: money_flow
+                raw_tags_column: tags
+                separator: ','
+
+      - name: is_active
+        data_tests:
+          - not_null
+
+  - name: reserve_expense_tag
+    description: >
+      Defines the tag that marks recurring expenses.
+      Exactly one active record must exist.
+      This constraint is validated by a singular dbt test.
+    config:
+      column_types:
+        tag: varchar(50)
+        is_active: boolean
+
+    columns:
+      - name: tag
+        data_tests:
+          - not_null
+          - unique
+          - active_seed_tags_exist_in_raw_tags:
+              config:
+                severity: warn
+              arguments:
+                raw_source_name: raw
+                raw_table_name: money_flow
+                raw_tags_column: tags
+                separator: ','
+
+      - name: is_active
+        data_tests:
+          - not_null
+
+  - name: dim_accounts
+    description: >
+      Reference dictionary of financial accounts.
+
+      Contains account metadata, opening date, opening balance,
+      currency and account classification flags used by downstream
+      analytical models.
+    config:
+      column_types:
+        account_id: integer
+        account_name: varchar(50)
+        opening_date: date
+        initial_amount: numeric
+        currency: varchar(10)
+        is_active: boolean
+        is_reserve: boolean
+        is_credit: boolean
+
+    columns:
+      - name: account_id
+        data_tests:
+          - not_null
+          - unique
+
+      - name: account_name
+        data_tests:
+          - not_null
+          - unique
+
+      - name: opening_date
+        data_tests:
+          - not_null
+
+      - name: initial_amount
+        data_tests:
+          - not_null
+
+      - name: currency
+        data_tests:
+          - not_null
+
+      - name: is_active
+        data_tests:
+          - not_null
+
+      - name: is_reserve
+        data_tests:
+          - not_null
+
+      - name: is_credit
+        data_tests:
+          - not_null
+
+  - name: category_mapping
+    description: >
+      Private mapping seed used to transform real transaction categories
+      into anonymized demo categories.
+
+      The seed is stored in seeds/private and is excluded from version control
+      because it contains the mapping key between real and demo category names,
+      as well as amount masking parameters for the demo analytics layer.
+    config:
+      column_types:
+        real_parent_category: varchar(100)
+        real_category: varchar(150)
+        demo_parent_category: varchar(100)
+        demo_category: varchar(150)
+        amount_factor: numeric
+
+    columns:
+      - name: real_parent_category
+        data_tests:
+          - not_null
+
+      - name: real_category
+        data_tests:
+          - not_null
+
+      - name: demo_parent_category
+        data_tests:
+          - not_null
+
+      - name: demo_category
+        data_tests:
+          - not_null
+
+      - name: amount_factor
+        data_tests:
+          - not_null
+
+  - name: dim_accounts_demo
+    description: >
+      Public demo account dictionary used by the anonymized demo analytics layer.
+
+      This seed mirrors the structure of the private dim_accounts seed but
+      contains synthetic account names and masked initial balances. It can be
+      committed to version control and used for public dashboard publication.
+    config:
+      column_types:
+        account_id: integer
+        account_name: varchar(100)
+        opening_date: date
+        initial_amount: numeric
+        currency: varchar(10)
+        is_active: boolean
+        is_reserve: boolean
+        is_credit: boolean
+
+    columns:
+      - name: account_id
+        data_tests:
+          - not_null
+          - unique
+
+      - name: account_name
+        data_tests:
+          - not_null
+          - unique
+
+      - name: opening_date
+        data_tests:
+          - not_null
+
+      - name: initial_amount
+        data_tests:
+          - not_null
+
+      - name: currency
+        data_tests:
+          - not_null
+
+      - name: is_active
+        data_tests:
+          - not_null
+
+      - name: is_reserve
+        data_tests:
+          - not_null
+
+      - name: is_credit
+        data_tests:
+          - not_null

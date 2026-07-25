@@ -1,0 +1,22 @@
+finance_analytics:
+  target: prod
+
+  outputs:
+    dev:
+      dbname: finance_analytics
+      host: localhost
+      password: change_me
+      port: 5432
+      schema: stg
+      threads: 4
+      type: postgres
+      user: dbt_runner
+    prod:
+      type: postgres
+      host: "{{ env_var('DBT_HOST') }}"
+      port: "{{ env_var('DBT_PORT') | int }}"
+      user: "{{ env_var('DBT_USER') }}"
+      password: "{{ env_var('DBT_RUNNER_PASSWORD') }}"
+      dbname: "{{ env_var('DBT_DBNAME') }}"
+      schema: stg
+      threads: 8

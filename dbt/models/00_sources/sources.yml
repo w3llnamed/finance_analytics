@@ -1,0 +1,17 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    tables:
+      - name: money_flow
+        description: "Raw snapshot of personal money flow transactions loaded from source files."
+
+  - name: infra
+    schema: infra
+    tables:
+      - name: ingestion_file_registry
+        description: >
+          Registry of all discovered and processed ingestion files.
+          Stores ingestion statuses, S3 metadata, processing timestamps,
+          row counts, checksums, and technical diagnostics for pipeline monitoring.

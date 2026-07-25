@@ -1,0 +1,35 @@
+version: 2
+
+macros:
+  - name: log_model_runs_to_infra
+    description: >
+      Stores dbt model execution metadata into the infra observability layer.
+
+      The macro creates and maintains the infra.dbt_model_runs_history table.
+      Each row represents one dbt model execution within a specific dbt
+      invocation_id.
+
+      It is intended to be executed via on-run-end after dbt run or dbt build.
+      The collected metadata is used for pipeline runtime monitoring,
+      model performance analysis, and failed model diagnostics.
+
+    arguments:
+      - name: results
+        type: list
+        description: >
+          Collection of dbt node execution results automatically available
+          in the on-run-end context. The macro filters this collection and
+          processes only nodes with resource_type = model.
+
+      - name: target
+        type: object
+        description: >
+          Current dbt target environment, for example dev, prod, or local.
+          Used to separate observability records between environments.
+
+      - name: invocation_id
+        type: string
+        description: >
+          Unique identifier of the current dbt execution run.
+          Used together with target_name and unique_id to identify
+          one model execution within one dbt invocation.

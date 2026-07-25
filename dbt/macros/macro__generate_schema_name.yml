@@ -1,0 +1,20 @@
+version: 2
+
+macros:
+  - name: generate_schema_name
+    description: >
+      Макрос переопределяет стандартную логику dbt формирования имени схемы.
+      Если у модели задан +schema, используется оно без модификаций.
+      В противном случае используется target.schema.
+      Применяется для строгой DWH-архитектуры: raw / stg / core / dm.
+    arguments:
+      - name: custom_schema_name
+        type: string
+        description: >
+          Значение схемы, заданное у модели через +schema
+          (может быть `none`).
+
+      - name: node
+        type: node
+        description: >
+          Объект модели dbt. Передаётся автоматически, напрямую не используется.

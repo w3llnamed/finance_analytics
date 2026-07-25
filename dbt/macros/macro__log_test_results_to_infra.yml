@@ -1,0 +1,45 @@
+version: 2
+
+macros:
+  - name: log_test_results_to_infra
+    description: >
+      Stores dbt test execution results into technical observability
+      tables located in the infra schema.
+
+      The macro creates and maintains two entities:
+
+      1. infra.dbt_test_results_history
+         Full historical log of dbt test executions.
+         Each row represents one test result
+         within a specific dbt invocation_id.
+
+      2. infra.dbt_test_results_current
+         Current snapshot of dbt test statuses.
+         Stores only the latest known state
+         of each test for a given target.
+
+      The macro is executed via on-run-end
+      after dbt run / dbt test execution.
+
+    arguments:
+      - name: results
+        type: list
+        description: >
+          Collection of dbt node execution results
+          automatically passed by dbt in the on-run-end context.
+          Used to extract dbt test execution metadata.
+
+      - name: target
+        type: object
+        description: >
+          Current dbt target environment
+          (for example: dev, prod, local).
+          Used to isolate observability data
+          between environments.
+
+      - name: invocation_id
+        type: string
+        description: >
+          Unique identifier of the current dbt execution run.
+          Used to group test results
+          within a single execution context.

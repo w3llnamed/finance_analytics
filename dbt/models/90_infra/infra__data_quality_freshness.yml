@@ -1,0 +1,75 @@
+version: 2
+
+models:
+  - name: infra__data_quality_freshness
+    description: >
+      Data freshness monitoring model for the BI quality dashboard.
+      Tracks the latest successful ingestion execution and calculates
+      current freshness indicators and pipeline status.
+
+    columns:
+      - name: ingestion_id
+        description: Unique identifier of the latest successful ingestion run.
+
+      - name: source_system
+        description: Source system from which the data file was ingested.
+
+      - name: source_object
+        description: Source business object associated with the ingestion.
+
+      - name: raw_table
+        description: Raw layer table populated by the ingestion process.
+
+      - name: s3_bucket
+        description: S3 bucket containing the processed source file.
+
+      - name: s3_key
+        description: Full S3 object key of the processed source file.
+
+      - name: file_size_bytes
+        description: Size of the processed source file in bytes.
+
+      - name: rows_loaded
+        description: Number of rows loaded during the ingestion run.
+
+      - name: discovered_at
+        description: Timestamp when the file was discovered by the ingestion pipeline.
+
+      - name: started_at
+        description: Timestamp when ingestion processing started.
+
+      - name: last_successful_load_at
+        description: Timestamp of the latest successful ingestion completion.
+
+      - name: checked_at
+        description: Timestamp when the freshness state was calculated.
+
+      - name: seconds_since_last_load
+        description: >
+          Number of seconds elapsed since the latest successful ingestion.
+
+      - name: time_since_last_load_text
+        description: >
+          Human-readable representation of elapsed time since the latest
+          successful ingestion.
+
+      - name: freshness_status
+        description: >
+          Freshness classification of the pipeline state.
+
+          Possible values:
+          - fresh   : data loaded within last 3 days
+          - warning : data loaded within last 7 days
+          - stale   : data older than 7 days
+          - no_data : no successful ingestion found
+
+        tests:
+          - not_null
+
+          - accepted_values:
+              arguments:
+                values:
+                  - fresh
+                  - warning
+                  - stale
+                  - no_data

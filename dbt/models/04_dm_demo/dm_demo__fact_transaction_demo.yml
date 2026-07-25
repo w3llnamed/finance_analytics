@@ -1,0 +1,70 @@
+version: 2
+
+models:
+  - name: dm_demo__fact_transaction_demo
+    description: >
+      Anonymized analytical mart for public demo dashboards.
+      The model mirrors dm__fact_transaction but replaces real accounts
+      and categories with demo values and masks transaction amounts using
+      category-level masking parameters from the private category_mapping seed.
+
+    columns:
+      - name: transaction_date
+        description: >
+          Transaction date and time.
+        tests:
+          - not_null
+
+      - name: account
+        description: >
+          Anonymized demo account associated with the transaction.
+        tests:
+          - not_null
+
+      - name: amount
+        description: >
+          Masked transaction amount.
+
+      - name: amount_abs
+        description: >
+          Absolute masked transaction amount.
+
+      - name: parent_category
+        description: >
+          Anonymized parent category of the transaction.
+
+      - name: category
+        description: >
+          Anonymized detailed category of the transaction.
+
+      - name: tags
+        description: >
+          Transaction tags removed from the demo mart for privacy.
+
+      - name: note
+        description: >
+          Transaction note removed from the demo mart for privacy.
+
+      - name: transaction_type
+        description: >
+          Transaction type.
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['Transfer out', 'Transfer in', 'Expense', 'Income', 'Opening balance']
+
+      - name: expense_type
+        description: >
+          Type of expense based on regular and reserve tags.
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['Regular', 'Reserve', 'Discretionary']
+
+      - name: account_type
+        description: >
+          Account type based on reserve and credit account flags.
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['Regular', 'Reserve', 'Credit']

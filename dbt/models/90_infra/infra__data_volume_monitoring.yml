@@ -1,0 +1,93 @@
+version: 2
+
+models:
+  - name: infra__data_volume_monitoring
+    description: >
+      Data volume monitoring model for the BI quality dashboard.
+
+      Compares the latest successful ingestion row count
+      against a historical baseline calculated from previous
+      successful loads.
+
+      Used for detecting abnormal decreases or spikes
+      in ingestion volume.
+
+    columns:
+      - name: ingestion_id
+        description: Unique identifier of the latest successful ingestion run.
+
+      - name: source_system
+        description: Source system from which the data was ingested.
+
+      - name: source_object
+        description: Business object associated with the ingestion process.
+
+      - name: raw_table
+        description: Raw layer table populated by the ingestion.
+
+      - name: s3_bucket
+        description: S3 bucket containing the processed source file.
+
+      - name: s3_key
+        description: Full S3 object key of the processed source file.
+
+      - name: file_size_bytes
+        description: Size of the processed source file in bytes.
+
+      - name: latest_load_at
+        description: Timestamp of the latest successful ingestion completion.
+
+      - name: latest_rows_loaded
+        description: Number of rows loaded during the latest successful ingestion.
+
+      - name: baseline_load_count
+        description: >
+          Number of historical successful loads used
+          for baseline calculation.
+
+      - name: avg_rows_loaded
+        description: >
+          Average number of rows loaded across historical baseline loads.
+
+      - name: min_rows_loaded
+        description: >
+          Minimum number of rows loaded within the historical baseline.
+
+      - name: max_rows_loaded
+        description: >
+          Maximum number of rows loaded within the historical baseline.
+
+      - name: deviation_pct
+        description: >
+          Percentage deviation of the latest load volume
+          relative to the historical average baseline.
+
+      - name: volume_status
+        description: >
+          Volume anomaly classification for the latest ingestion.
+
+          Possible values:
+          - normal           : latest load volume is within expected range
+          - warning          : moderate deviation from expected volume
+          - anomaly          : critical deviation from expected volume
+          - weak_baseline    : insufficient historical data for reliable comparison
+          - no_baseline      : no historical successful loads available
+          - invalid_baseline : historical baseline is invalid (e.g. zero average)
+
+        tests:
+          - not_null
+
+          - accepted_values:
+              arguments:
+                values:
+                  [
+                    'normal',
+                    'warning',
+                    'anomaly',
+                    'weak_baseline',
+                    'no_baseline',
+                    'invalid_baseline'
+                  ]
+
+      - name: checked_at
+        description: Timestamp when the monitoring calculation was performed.

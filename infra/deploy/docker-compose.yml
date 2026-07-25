@@ -1,0 +1,213 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+
+      DBT_RUNNER_PASSWORD: ${DBT_RUNNER_PASSWORD}
+      INGESTION_USER_PASSWORD: ${INGESTION_USER_PASSWORD}
+      BI_USER_PASSWORD: ${BI_USER_PASSWORD}
+      BI_DEMO_USER_PASSWORD: ${BI_DEMO_USER_PASSWORD}
+      DEV_USER_PASSWORD: ${DEV_USER_PASSWORD}
+
+    ports:
+      - "127.0.0.1:5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../bootstrap:/docker-entrypoint-initdb.d
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  superset:
+    build:
+      context: .
+      dockerfile: superset.Dockerfile
+
+    container_name: superset
+    restart: unless-stopped
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    ports:
+      - "127.0.0.1:8088:8088"
+
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+      SUPERSET_ADMIN_USERNAME: ${SUPERSET_ADMIN_USERNAME}
+      SUPERSET_ADMIN_FIRSTNAME: ${SUPERSET_ADMIN_FIRSTNAME}
+      SUPERSET_ADMIN_LASTNAME: ${SUPERSET_ADMIN_LASTNAME}
+      SUPERSET_ADMIN_EMAIL: ${SUPERSET_ADMIN_EMAIL}
+      SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD}
+
+    volumes:
+      - superset_home:/app/superset_home
+
+    command: >
+      /bin/sh -c "
+      superset db upgrade &&
+      superset fab create-admin
+      --username $$SUPERSET_ADMIN_USERNAME
+      --firstname $$SUPERSET_ADMIN_FIRSTNAME
+      --lastname $$SUPERSET_ADMIN_LASTNAME
+      --email $$SUPERSET_ADMIN_EMAIL
+      --password $$SUPERSET_ADMIN_PASSWORD || true &&
+      superset init &&
+      superset run -h 0.0.0.0 -p 8088
+      "
+
+  prefect-db:
+    image: postgres:16
+    container_name: prefect-db
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: ${PREFECT_DB_USER}
+      POSTGRES_PASSWORD: ${PREFECT_DB_PASSWORD}
+      POSTGRES_DB: ${PREFECT_DB_NAME}
+
+    volumes:
+      - prefect_db_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  prefect-redis:
+    image: redis:7
+    container_name: prefect-redis
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  prefect-server:
+    image: prefecthq/prefect:3-python3.12
+    container_name: prefect-server
+    restart: unless-stopped
+
+    command: prefect server start --host 0.0.0.0
+
+    environment:
+      DO_NOT_TRACK: "1"
+      PREFECT_SERVER_ANALYTICS_ENABLED: "false"
+      PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://${PREFECT_DB_USER}:${PREFECT_DB_PASSWORD}@prefect-db:5432/${PREFECT_DB_NAME}
+      PREFECT_MESSAGING_BROKER: prefect_redis.messaging
+      PREFECT_MESSAGING_CACHE: prefect_redis.messaging
+      PREFECT_REDIS_MESSAGING_HOST: prefect-redis
+      PREFECT_UI_API_URL: http://localhost:4200/api
+
+    ports:
+      - "127.0.0.1:4200:4200"
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:4200/api/health', timeout=5)"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+    depends_on:
+      prefect-db:
+        condition: service_healthy
+      prefect-redis:
+        condition: service_healthy
+
+  prefect-services:
+    image: prefecthq/prefect:3-python3.12
+    container_name: prefect-services
+    restart: unless-stopped
+
+    command: prefect server services start
+
+    environment:
+      PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://${PREFECT_DB_USER}:${PREFECT_DB_PASSWORD}@prefect-db:5432/${PREFECT_DB_NAME}
+      PREFECT_MESSAGING_BROKER: prefect_redis.messaging
+      PREFECT_MESSAGING_CACHE: prefect_redis.messaging
+      PREFECT_REDIS_MESSAGING_HOST: prefect-redis
+
+    depends_on:
+      prefect-db:
+        condition: service_healthy
+      prefect-redis:
+        condition: service_healthy
+
+  prefect-worker:
+    build:
+      context: ../..
+      dockerfile: infra/deploy/prefect-worker.Dockerfile
+
+    container_name: prefect-worker
+    restart: unless-stopped
+
+    command: >
+      bash -c "
+      prefect work-pool create finance-process-pool --type process || true &&
+      prefect worker start --pool finance-process-pool
+      "
+
+    environment:
+      PREFECT_API_URL: http://prefect-server:4200/api
+      DO_NOT_TRACK: "1"
+
+      PYTHONPATH: /opt/finance_analytics
+
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DB: ${POSTGRES_DB}
+      PG_USER: ingestion_user
+      INGESTION_USER_PASSWORD: ${INGESTION_USER_PASSWORD}
+
+      DBT_HOST: postgres
+      DBT_PORT: 5432
+      DBT_DBNAME: ${POSTGRES_DB}
+      DBT_USER: dbt_runner
+      DBT_RUNNER_PASSWORD: ${DBT_RUNNER_PASSWORD}
+
+    volumes:
+      - ../..:/opt/finance_analytics
+      - ../../dbt/profiles.yml.example:/root/.dbt/profiles.yml:ro
+
+    working_dir: /opt/finance_analytics
+
+    depends_on:
+      prefect-server:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  superset_home:
+  prefect_db_data:

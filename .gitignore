@@ -1,0 +1,61 @@
+# =========================
+# Python
+# =========================
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# =========================
+# Environment / secrets
+# =========================
+.env
+*.env
+
+# =========================
+# Logs
+# =========================
+logs/
+*.log
+
+# =========================
+# dbt
+# =========================
+target/
+dbt_packages/
+
+# Private dbt seed data
+dbt/seeds/private/*.csv
+
+# Keep public templates and documentation
+!dbt/seeds/private/*.csv.example
+!dbt/seeds/private/README.md
+
+# =========================
+# IDE
+# =========================
+.vscode/
+.idea/
+
+# =========================
+# OS
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Local databases / backups
+# =========================
+*.db
+*.sqlite
+*.sqlite3
+*.bak
+*.backup
+*.dump
+
+
+# =========================
+# TODO
+# =========================
+TODO.md

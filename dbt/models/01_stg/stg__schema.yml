@@ -1,0 +1,98 @@
+version: 2
+
+models:
+  - name: stg__fact_transaction
+    description: >
+      Staging model for raw money flow transactions.
+      The model applies technical normalization to the latest successfully
+      loaded ingestion batch: trims text fields, converts empty strings to NULL,
+      normalizes currency codes, parses transaction date and numeric amounts,
+      and derives helper flags for downstream core models.
+
+    columns:
+      - name: raw_id
+        description: Technical primary key from raw layer.
+        tests:
+          - not_null
+          - unique
+
+      - name: source_number
+        description: Transaction number from source system or file.
+
+      - name: transaction_date
+        description: Parsed transaction timestamp.
+        tests:
+          - not_null
+
+      - name: account
+        description: Account name after basic text cleanup.
+
+      - name: amount
+        description: Parsed transaction amount in source currency as NUMERIC(18,2).
+
+      - name: currency
+        description: Transaction currency normalized to upper case.
+
+      - name: parent_category
+        description: Top-level category after basic text cleanup.
+
+      - name: subcategory
+        description: Subcategory after basic text cleanup.
+
+      - name: category
+        description: Leaf category after basic text cleanup.
+
+      - name: counterparty
+        description: Counterparty after basic text cleanup.
+
+      - name: transfer_account
+        description: Target or related account for transfer transactions.
+
+      - name: transfer_amount
+        description: Parsed transfer amount as NUMERIC(18,2).
+
+      - name: transfer_currency
+        description: Transfer currency normalized to upper case.
+
+      - name: tags
+        description: Raw tags string after basic text cleanup.
+
+      - name: place
+        description: Place of transaction after basic text cleanup.
+
+      - name: note
+        description: Free-text note after basic text cleanup.
+
+      - name: ingested_at
+        description: Timestamp when the row was ingested into raw.
+        tests:
+          - not_null
+
+      - name: ingested_by
+        description: Technical user or process that loaded the row.
+        tests:
+          - not_null
+
+      - name: source_file
+        description: Source file name used for ingestion.
+        tests:
+          - not_null
+
+      - name: ingestion_id
+        description: Identifier of the ingestion batch from infra.ingestion_file_registry.
+        tests:
+          - not_null
+
+      - name: flow_type
+        description: >
+          Derived technical flow type: income, expense, or zero.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['income', 'expense', 'zero']
+
+      - name: is_transfer
+        description: Flag showing whether the row represents a transfer transaction.
+        tests:
+          - not_null

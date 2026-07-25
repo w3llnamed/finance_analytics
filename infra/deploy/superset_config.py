@@ -1,0 +1,9 @@
+import os
+
+SECRET_KEY = os.environ["SUPERSET_SECRET_KEY"]
+
+FEATURE_FLAGS = {
+    "DASHBOARD_RBAC": True,
+}
+
+ENABLE_PROXY_FIX = True

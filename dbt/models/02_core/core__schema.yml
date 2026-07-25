@@ -1,0 +1,138 @@
+version: 2
+
+models:
+  - name: core__fact_transaction
+    description: >
+      Canonical fact table for personal money flow transactions.
+      The model stores income, expense, transfer and opening balance operations
+      in a single business-level structure and serves as the single source of
+      truth for downstream analytical marts.
+
+    columns:
+      - name: transaction_id
+        description: >
+          Stable transaction identifier generated from canonical transaction
+          attributes, including transfer-related fields and transfer type.
+        tests:
+          - not_null
+          - unique
+
+      - name: source_number
+        description: >
+          Original transaction number from the source file or application.
+
+      - name: transaction_ts
+        description: >
+          Transaction date in canonical format.
+        tests:
+          - not_null
+
+      - name: account
+        description: >
+          Account or wallet to which the canonical transaction record belongs.
+        tests:
+          - not_null
+
+      - name: amount
+        description: >
+          Signed transaction amount in source currency.
+          Expenses are negative, incomes are positive.
+          Opening balances keep their seeded sign.
+
+      - name: currency
+        description: >
+          Currency code of the transaction normalized to upper case.
+
+      - name: parent_category
+        description: >
+          Top-level category of the transaction from the source system.
+
+      - name: subcategory
+        description: >
+          Intermediate category of the transaction from the source system.
+
+      - name: category
+        description: >
+          Lowest-level category of the transaction from the source system.
+
+      - name: counterparty
+        description: >
+          Counterparty related to the transaction, if available.
+
+      - name: transfer_account
+        description: >
+          Counter account used for transfer operations.
+
+      - name: transfer_amount
+        description: >
+          Transfer amount recorded for inter-account movement, if available.
+
+      - name: transfer_currency
+        description: >
+          Currency code of the transfer amount normalized to upper case.
+
+      - name: tags
+        description: >
+          Optional tags assigned to the transaction in the source system.
+
+      - name: place
+        description: >
+          Place, merchant location or contextual location of the transaction.
+
+      - name: note
+        description: >
+          Free-text note attached to the transaction.
+
+      - name: amount_abs
+        description: >
+          Absolute transaction amount used for analytical calculations and
+          visualizations where signed values are not convenient.
+        tests:
+          - not_null
+
+      - name: transaction_type
+        description: >
+          Canonical transaction type used in downstream analytics.
+          Possible values: income, expense, transfer_in, transfer_out,
+          opening_balance, other.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['income', 'expense', 'other', 'transfer_in', 'transfer_out', 'opening_balance']
+
+      - name: is_active_account
+        description: >
+          Flag from dim_accounts showing whether the account is active.
+
+      - name: is_reserve_account
+        description: >
+          Flag from dim_accounts showing whether the account is a reserve account.
+
+      - name: is_credit_account
+        description: >
+          Flag from dim_accounts showing whether the account is a credit account.
+
+      - name: ingested_at
+        description: >
+          Timestamp when the source transaction record was ingested into the raw layer.
+          For opening balance seed rows, technical timestamp of seed materialization.
+        tests:
+          - not_null
+
+      - name: ingested_by
+        description: >
+          Technical identifier of the process or user that ingested the source data
+          or materialized the seed-based opening balance.
+
+      - name: source_file
+        description: >
+          Name of the source file from which the transaction was loaded,
+          or technical seed source for opening balances.
+        tests:
+          - not_null
+
+      - name: ingestion_id
+        description: >
+          Identifier of the ingestion batch from infra.ingestion_file_registry.
+          NULL for seed-based opening balance rows.

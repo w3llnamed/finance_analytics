@@ -1,0 +1,12 @@
+#!/bin/bash
+set -e
+
+psql -v ON_ERROR_STOP=1 \
+  --username "$POSTGRES_USER" \
+  --dbname "$POSTGRES_DB" <<-EOSQL
+ALTER ROLE dbt_runner     WITH PASSWORD '${DBT_RUNNER_PASSWORD}';
+ALTER ROLE ingestion_user WITH PASSWORD '${INGESTION_USER_PASSWORD}';
+ALTER ROLE bi_user        WITH PASSWORD '${BI_USER_PASSWORD}';
+ALTER ROLE bi_demo_user   WITH PASSWORD '${BI_DEMO_USER_PASSWORD}';
+ALTER ROLE dev_user       WITH PASSWORD '${DEV_USER_PASSWORD}';
+EOSQL

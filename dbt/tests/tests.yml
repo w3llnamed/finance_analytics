@@ -1,0 +1,32 @@
+version: 2
+
+data_tests:
+  - name: assert_core_accounts_exist_in_dim_accounts
+    description: >
+      Validates that all distinct accounts present
+      in core__fact_transaction exist in the dim_accounts seed.
+
+      Prevents unclassified or unmanaged accounts
+      from appearing in downstream analytics.
+
+  - name: assert_core_categories_exist_in_category_mapping
+    description: >
+      Validates that all distinct category combinations present
+      in core__fact_transaction exist in the category_mapping seed.
+
+      Prevents unclassified or unmanaged categories
+      from appearing in downstream analytics.
+
+  - name: assert_regular_expense_tag_has_at_most_one_active_row
+    description: >
+      Проверяет, что seed regular_expense_tag содержит
+      не более одной активной записи.
+      Это предотвращает дублирование транзакций
+      при JOIN в dm__fact_transaction.
+
+  - name: assert_reserve_expense_tag_has_at_most_one_active_row
+    description: >
+      Проверяет, что seed reserve_expense_tag содержит
+      не более одной активной записи.
+      Это предотвращает дублирование транзакций
+      при JOIN в dm__fact_transaction.

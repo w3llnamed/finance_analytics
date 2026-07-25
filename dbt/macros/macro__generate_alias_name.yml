@@ -1,0 +1,21 @@
+version: 2
+
+macros:
+  - name: generate_alias_name
+    description: >
+      Overrides dbt's default object naming logic.
+      If a model defines the +alias parameter, that value is used.
+      Otherwise, the layer prefix is automatically removed from the model name
+      (raw__, stg__, core__, dm__, dm_demo__, seed__, infra__).
+
+    arguments:
+      - name: custom_alias_name
+        type: string
+        description: >
+          Alias value defined for the model using the +alias configuration
+          (may be `none`).
+
+      - name: node
+        type: node
+        description: >
+          dbt model node object. Used to retrieve the model name.
