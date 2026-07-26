@@ -84,17 +84,17 @@ Persistent Docker volumes are used to preserve:
 
 ## Architecture
 
-```
+```mermaid
 flowchart TB
 
     CSV["Money Flow CSV"]
-    S3["Timeweb S3"]
+    S3["S3"]
     INGEST["Python Ingestion"]
     PREFECT["Prefect Orchestration"]
     BI["Superset"]
 
-    PREFECT -..-> INGEST
-    PREFECT -..-> STG
+    PREFECT -.-> INGEST
+    PREFECT -.-> STG
 
     CSV --> S3
     S3 --> INGEST
