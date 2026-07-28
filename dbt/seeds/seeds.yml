@@ -111,7 +111,7 @@ seeds:
         data_tests:
           - not_null
 
-  - name: category_mapping
+  - name: category_mapping_demo
     description: >
       Private mapping seed used to transform real transaction categories
       into anonymized demo categories.

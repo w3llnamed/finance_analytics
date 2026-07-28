@@ -1,13 +1,14 @@
 # Infrastructure
 
-This directory contains infrastructure configuration for the local Finance Analytics Platform environment.
+This directory contains infrastructure configuration for the Finance Analytics Platform.
 
-It includes PostgreSQL bootstrap scripts and Docker-based deployment configuration for PostgreSQL and Apache Superset.
+It includes PostgreSQL bootstrap scripts and Docker-based deployment
+configuration for PostgreSQL, Apache Superset, Prefect and Redis.
 
 
 ## Structure
 
-```text
+```
 infra/
 ├── bootstrap/            # PostgreSQL initialization scripts
 └── deploy/               # Docker Compose, Superset and Prefect deployment configuration
@@ -20,7 +21,7 @@ The `bootstrap/` directory contains scripts that initialize the PostgreSQL datab
 
 PostgreSQL automatically executes files mounted into:
 
-```text
+```
 /docker-entrypoint-initdb.d
 ```
 
@@ -40,7 +41,11 @@ Current bootstrap scripts:
 
 ## Deployment
 
-The `deploy/` directory defines the local Docker-based analytics and orchestration environment.
+The `deploy/` directory defines the Docker-based analytics and orchestration environment.
+
+The same Docker Compose stack can be started locally or on a Linux server.
+Public server access, DNS, HTTPS, firewall rules and reverse-proxy
+configuration are managed separately at the host level.
 
 Current services:
 
@@ -52,23 +57,18 @@ Current services:
 - Prefect Services — background Prefect server services
 - Prefect Worker — execution of scheduled ingestion and dbt flows
 
-The analytical PostgreSQL database is exposed only on localhost:
 
-```text
-127.0.0.1:5432
-```
+With the current Docker Compose port bindings, the services are available
+from the Docker host at:
 
-Superset is exposed on:
+- PostgreSQL: `127.0.0.1:5432`
+- Superset: `http://127.0.0.1:8088`
+- Prefect Server: `http://127.0.0.1:4200`
 
-```text
-http://localhost:8088
-```
+The loopback bindings prevent direct external access to these services.
 
-Prefect Server is exposed on:
-
-```text
-http://localhost:4200
-```
+For a public server deployment, Superset remains bound to the loopback
+interface and is exposed through a reverse proxy with HTTPS.
 
 The Prefect Worker automatically creates the `finance-process-pool` work pool if necessary and executes scheduled pipeline runs.
 
@@ -85,7 +85,12 @@ The deployment uses persistent Docker volumes:
 - `superset_home` — Superset metadata, users and dashboard configuration
 - `prefect_db_data` — Prefect orchestration metadata
 
-The project source code is mounted into the Prefect Worker container from the local repository.
+The repository source directory on the Docker host is bind-mounted into the
+Prefect Worker container at:
+
+```
+/opt/finance_analytics
+```
 
 These volumes are managed by Docker and are not stored in git.
 
@@ -96,28 +101,33 @@ Bootstrap scripts are executed only when PostgreSQL initializes an empty data di
 
 This means they run on the first startup of a new `postgres_data` volume.
 
-To recreate the database from scratch:
+To recreate the complete environment from scratch, all persistent Docker
+volumes must be removed.
 
-```bash
+> [!CAUTION]
+> The following operation permanently deletes:
+>
+> - analytical PostgreSQL data;
+> - Superset metadata, users and dashboard configuration;
+> - Prefect orchestration metadata.
+>
+> Do not execute this command unless the data is backed up or intentionally
+> disposable.
+
+From the repository root:
+
+```
 cd infra/deploy
 docker compose down -v
-docker compose up -d
+docker compose up -d --build
 ```
-
-Warning: `docker compose down -v` permanently removes:
-
-- analytical PostgreSQL data;
-- Superset metadata, users and dashboard configuration;
-- Prefect orchestration metadata.
 
 
 ## Superset Image
 
 Superset is built from a custom Docker image based on:
 
-```dockerfile
-apache/superset:latest
-```
+`apache/superset:latest`
 
 Additional Python dependencies are installed:
 
@@ -131,88 +141,182 @@ Additional Python dependencies are installed:
 
 ## Prefect Worker Image
 
-The project includes a dedicated Docker image for Prefect workers:
+The project includes a dedicated Docker image for the Prefect Worker:
 
-```text
-prefect-worker.Dockerfile
-```
+`infra/deploy/prefect-worker.Dockerfile`
 
-The image contains all dependencies required to execute:
+The worker image contains:
 
-* Prefect flows;
-* ingestion scripts;
-* dbt commands.
+- Python
+- Prefect
+- dbt
+- project dependencies installed from the root requirements.txt
+- the runtime environment required by ingestion and orchestration code
 
-The worker is responsible for running scheduled orchestration workflows defined in the project.
+The repository source directory is mounted into the running container at:
+
+`/opt/finance_analytics`
+
+The worker executes:
+
+- scheduled Prefect flows
+- Python ingestion scripts
+- dbt transformations and tests
+
+A separate Python installation or virtual environment on the Docker host is
+not required for container-based deployment.
 
 
 ## Environment Variables
 
 Runtime configuration is provided through:
 
-```text
-infra/deploy/.env
+`infra/deploy/.env`
+
+The `.env` file contains credentials and other sensitive runtime values.
+It is excluded from version control and must not be committed.
+
+From the repository root, create it from the public template:
+
 ```
-
-The `.env` file is not stored in git.
-
-Use the example file as a template:
-
-```bash
 cp infra/deploy/.env.example infra/deploy/.env
 ```
+
+Open the created file and replace every placeholder value before starting the
+containers.
+
+The public `.env.example` file documents the required variable names but must
+not contain real secrets.
 
 
 ## Start Services
 
-Start the complete local environment:
+Before starting the containers, create:
 
-```bash
+- `infra/deploy/.env`;
+- the required private seed files.
+
+From the repository root, build and start the complete environment:
+
+```
 cd infra/deploy
-docker compose up -d
+docker compose up -d --build
 ```
 
-Check service status:
+Docker Compose automatically reads `docker-compose.yml` and `.env` from the
+current `infra/deploy` directory.
 
-```bash
+The command:
+- builds the custom Superset and Prefect Worker images;
+- starts all services in the background.
+
+During the Prefect Worker image build, Python project dependencies are
+installed from the root `requirements.txt` file.
+
+Check the service status:
+
+```
 docker compose ps
 ```
 
-Deploy Prefect flows:
+Open the local interfaces:
 
-```bash
-cd ../..
-prefect deploy
+- Superset: `http://localhost:8088`
+- Prefect Server: `http://localhost:4200`
+
+
+## Deploy Prefect Flows
+
+Run the deployment command inside the Prefect Worker container:
+
+```
+docker exec -it \
+  -w /opt/finance_analytics \
+  prefect-worker \
+  prefect deploy
 ```
 
-The containerized Prefect Worker automatically connects to Prefect Server, creates the `finance-process-pool` work pool if it does not already exist and starts polling it for scheduled flow runs.
+The command:
 
+- runs inside the `prefect-worker` container;
+- uses `/opt/finance_analytics` as the working directory;
+- reads the project-level `prefect.yaml`;
+- creates or updates the Prefect deployment.
+
+The worker automatically connects to Prefect Server, creates the
+`finance-process-pool` work pool if necessary and polls it for scheduled flow
+runs.
+
+
+## Run dbt Manually
+
+Run the full dbt build inside the Prefect Worker container:
+
+```
+docker exec -it \
+  -w /opt/finance_analytics/dbt \
+  prefect-worker \
+  dbt build
+```
+
+The working directory is set to `/opt/finance_analytics/dbt` because
+`dbt_project.yml` is stored in that directory.
+
+
+## Run Ingestion Manually
+
+Run the ingestion script inside the Prefect Worker container:
+
+```
+docker exec -it \
+  -w /opt/finance_analytics \
+  prefect-worker \
+  python ingestion/load_money_flow_from_s3.py
+```
 
 ## Check Service Status
 
-Check running services:
+Run these commands from the `infra/deploy` directory.
 
-```bash
+Check all containers:
+```
 docker compose ps
 ```
 
-View logs:
-
-```bash
+View logs from all services:
+```
 docker compose logs
 ```
 
-Follow logs:
-
-```bash
+Follow logs continuously:
+```
 docker compose logs -f
 ```
 
+Follow logs for one service, for example the Prefect Worker:
+```
+docker compose logs -f prefect-worker
+```
 
 ## Stop Services
+Run these commands from the `infra/deploy` directory.
 
-Stop all Docker services while preserving persistent data:
-
-```bash
+Stop and remove the containers while preserving persistent data:
+```
 docker compose down
 ```
+
+The named Docker volumes are preserved and will be reused on the next startup.
+
+To stop the containers without removing them:
+
+```
+docker compose stop
+```
+
+The difference is:
+
+- `stop` stops existing containers without removing them;
+- `down` stops and removes containers and the Compose network;
+- `down` without `-v` preserves named volumes;
+- `down -v` permanently deletes named volumes and their data.

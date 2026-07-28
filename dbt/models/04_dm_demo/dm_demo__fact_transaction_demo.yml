@@ -6,7 +6,7 @@ models:
       Anonymized analytical mart for public demo dashboards.
       The model mirrors dm__fact_transaction but replaces real accounts
       and categories with demo values and masks transaction amounts using
-      category-level masking parameters from the private category_mapping seed.
+      category-level masking parameters from the private category_mapping_demo seed.
 
     columns:
       - name: transaction_date

@@ -67,7 +67,7 @@ Normalization and business logic are implemented in downstream dbt layers.
 
 The ingestion pipeline uses environment variables from:
 
-```text
+```
 infra/deploy/.env
 ```
 
@@ -83,7 +83,7 @@ Main configuration groups include:
 
 CSV columns are mapped into `raw.money_flow` columns using an explicit mapping dictionary:
 
-```python
+```
 CSV_TO_RAW_COLUMN_MAP
 ```
 
@@ -94,28 +94,23 @@ This keeps ingestion logic deterministic and source-aligned.
 
 The ingestion layer is typically executed through Prefect orchestration.
 
-For local debugging:
 
-Activate virtual environment:
-
-```bash
-source .venv/bin/activate
 ```
-
-Run ingestion:
-
-```bash
-python ingestion/load_money_flow_from_s3.py
+docker exec -it \
+  -w /opt/finance_analytics \
+  prefect-worker \
+  python ingestion/load_money_flow_from_s3.py
 ```
 
 The script loads the latest available CSV file from S3 and registers ingestion metadata in PostgreSQL.
 
+**The command must be executed after the Docker Compose environment has been started.**
 
 ## Metadata Tracking
 
 Each ingestion batch is registered in:
 
-```text
+```
 infra.ingestion_file_registry
 ```
 
@@ -149,9 +144,13 @@ The ingestion layer is normally executed by Prefect flows.
 
 Prefect is responsible for:
 
-- checking S3 storage for new files;
-- preventing duplicate processing using ingestion metadata;
-- triggering ingestion runs;
-- executing downstream dbt transformations.
+- scheduling pipeline runs
+- triggering the ingestion script
+- executing downstream dbt transformations after successful ingestion
+- recording flow execution status and logs
 
-Direct execution of the ingestion script remains available for local development and debugging.
+Duplicate file detection and ingestion idempotency are implemented inside the
+ingestion layer using `infra.ingestion_file_registry`.
+
+Direct execution of the ingestion script remains available for development and
+debugging.

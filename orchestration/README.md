@@ -23,7 +23,7 @@ The orchestration layer does not perform transformations itself. Its role is to 
 
 Current orchestration flow:
 
-```text
+```
 Timeweb S3
       │
       ▼
@@ -48,7 +48,7 @@ The orchestration flow relies on ingestion metadata stored in PostgreSQL.
 
 ## Structure
 
-```text
+```
 orchestration/
 ├── README.md
 └── flows/
@@ -57,7 +57,7 @@ orchestration/
 
 Project-level deployment configuration is stored in:
 
-```text
+```
 prefect.yaml
 ```
 
@@ -82,7 +82,7 @@ Deployments are configured through Prefect.
 
 Current schedule:
 
-```yaml
+```
 interval: 300
 ```
 
@@ -90,33 +90,38 @@ The flow runs every 5 minutes.
 
 Deployment configuration is stored in:
 
-```text
+```
 prefect.yaml
 ```
 
 
 ## Deployment
 
-Deploy flow configuration:
+Create or update the deployment from inside the running Prefect Worker
+container:
 
 ```bash
-prefect deploy
+docker exec -it \
+  -w /opt/finance_analytics \
+  prefect-worker \
+  prefect deploy
 ```
 
-Start worker:
+The deployment configuration is read from the project-level `prefect.yaml`
+file.
 
-```bash
-prefect worker start --pool finance-process-pool
-```
+The Prefect Worker is started automatically as part of the Docker Compose
+environment.
 
-The worker continuously polls Prefect for scheduled flow runs.
+It connects to Prefect Server, creates the `finance-process-pool` work pool if
+necessary and continuously polls it for scheduled flow runs.
 
 
 ## Docker Integration
 
 Prefect workers are deployed using a dedicated Docker image:
 
-```text
+```
 infra/deploy/prefect-worker.Dockerfile
 ```
 
@@ -134,7 +139,7 @@ The orchestration layer is designed to prevent duplicate processing.
 
 Before executing ingestion, the flow verifies whether the source file has already been registered in:
 
-```text
+```
 infra.ingestion_file_registry
 ```
 

@@ -1,8 +1,9 @@
 # Private Seeds
 
-This directory contains private dbt seeds required to build the project with real account metadata.
+This directory contains private dbt seeds required to build the project with user-specific account metadata and opening balances.
 
 The real seed files are intentionally excluded from version control because they contain account names and attributes derived from personal financial data.
+
 
 ## Required Private File
 
@@ -27,28 +28,36 @@ cp dbt/seeds/private/dim_accounts.csv.example \
 
 Then replace the example rows with the required local account values.
 
-## Demo Seed Dependencies
 
-The public demo dashboard depends on three seeds:
+## Optional Demo Environment
 
-```text
-dbt/seeds/private/dim_accounts.csv
-dbt/seeds/demo/dim_accounts_demo.csv
-dbt/seeds/demo/category_mapping.csv
-```
+The project optionally includes an anonymized demo environment for public dashboard deployment.
 
-`dim_accounts.csv` is a private seed containing the real account definitions used by the main data models.
+Reproducing the demo environment additionally requires the following seed files:
+
+`dbt/seeds/private/dim_accounts_demo.csv`
+`dbt/seeds/private/category_mapping_demo.csv`
+
+
+`dim_accounts.csv` is a private seed containing the real account metadata and opening balances used by the canonical analytical models.
 
 `dim_accounts_demo.csv` is a public seed containing anonymized account names. Demo accounts are linked to real accounts through `account_id`.
 
-`category_mapping.csv` is a public seed containing mappings from real transaction categories to anonymized demo categories, together with category-level amount masking parameters.
+`category_mapping_demo.csv` is a private seed containing mappings from real transaction categories to anonymized demo categories, together with category-level amount masking parameters.
 
-The demo models first identify real accounts and categories and then replace them with the corresponding public demo values. For this reason, the private `dim_accounts.csv` file is still required even when only the demo dashboard is being reproduced.
+The demo models are built from the same canonical transaction pipeline as the main analytical mart. They first use the real account metadata from the private seed and then replace
+sensitive attributes using the demo seed files.
 
-The public demo seeds are included in version control and normally do not need to be changed. However, `dim_accounts_demo.csv` must remain consistent with the account identifiers defined in the local private seed.
+`dim_accounts_demo.csv` is included in version control.
+`category_mapping_demo.csv` is excluded from version control because it contains mappings derived from real transaction categories. A public `.example` template is provided for creating the local file.
+
 
 ## Build Requirements
 
-A full dbt build cannot complete without a local `dim_accounts.csv` file.
+A standard private deployment requires only the local `dim_accounts.csv` file.
 
-The private account seed is used by core models, demo models and data tests. The public `dim_accounts_demo.csv` and `category_mapping.csv` seeds provide anonymization rules for the demo layer but do not replace the private account definitions.
+The optional demo environment additionally requires the demo seed files described above.
+
+The demo seeds are required only when reproducing the optional anonymized demo environment.
+
+The private `dim_accounts.csv` seed is required by the core analytical models and their associated data tests.

@@ -32,27 +32,49 @@ This keeps staging lightweight while persisting business and analytical layers f
 
 ## Seeds
 
-The project uses dbt seeds for small static reference datasets.
+The project uses dbt seeds for small static reference datasets and user-specific configuration.
 
 Public seeds included in the repository:
 
-- `dim_accounts_demo.csv` — synthetic account data used by the anonymized demo mart;
 - `regular_expense_tag.csv` — tags used to identify regular expenses;
-- `reserve_expense_tag.csv` — tags used to identify reserve-related expenses.
+- `reserve_expense_tag.csv` — tags used to identify reserve-related expenses;
+- `dim_accounts_demo.csv` — anonymized account names used by the optional demo mart.
 
-The following required seeds contain mappings derived from personal financial
-data and are therefore excluded from version control:
+The following private seed is required for a standard project deployment:
 
-- `dim_accounts.csv` — account reference data used by the core transaction model;
-- `category_mapping.csv` — mapping between real and anonymized demo categories, including amount masking coefficients.
+- `dim_accounts.csv` — user-specific account metadata and opening balances used by the canonical transaction models and balance calculations.
 
-Templates for both files are available in:
+The optional demo environment additionally requires:
 
-`dbt/seeds/private/`
+- `category_mapping_demo.csv` — mappings from real transaction categories to anonymized demo categories, including category-level amount masking coefficients.
 
-Create the real local files from the templates before running a full dbt build.
+Both `dim_accounts.csv` and `category_mapping_demo.csv` are excluded from version control because they contain mappings derived from personal financial data.
 
-Seeds are loaded into the `seed` schema.
+Public templates for the private seed files are available in:
+
+```
+dbt/seeds/private/dim_accounts.csv.example
+dbt/seeds/private/category_mapping_demo.csv.example
+```
+
+Create the required private account seed before running a standard dbt build:
+
+```
+cp dbt/seeds/private/dim_accounts.csv.example \
+   dbt/seeds/private/dim_accounts.csv
+```
+
+To reproduce the optional demo environment, also create the private demo category mapping:
+```
+cp dbt/seeds/private/category_mapping_demo.csv.example \
+   dbt/seeds/private/category_mapping_demo.csv
+```
+
+Then replace the example rows in both files with the required local values.
+
+The public `dim_accounts_demo.csv` seed is included in version control and normally does not need to be modified. However, its account_id values must remain consistent with the account identifiers defined in the local private `dim_accounts.csv` seed.
+
+Seeds are loaded into the seed schema.
 
 
 ## Tests
@@ -94,33 +116,85 @@ This makes dbt runs and test results available for monitoring in Superset dashbo
 
 ## Running dbt
 
-Install dbt dependencies:
+The project is designed to execute dbt inside the running `prefect-worker`
+container.
 
-```bash
-dbt deps
+The container already includes:
+
+- Python;
+- dbt;
+- all project dependencies;
+- the mounted project source code.
+
+The working directory must be set to the dbt project directory because
+`dbt_project.yml` is located in:
+
+```
+/opt/finance_analytics/dbt
 ```
 
-Run transformations and tests:
+### Install dbt Packages
 
-```bash
-dbt build
+Install package dependencies defined in `packages.yml`:
+
+```
+docker exec -it \
+  -w /opt/finance_analytics/dbt \
+  prefect-worker \
+  dbt deps
 ```
 
-Run only models:
+### Build the Entire Project
 
-```bash
-dbt run
+Run models, seeds, snapshots (if configured) and tests:
+
+```
+docker exec -it \
+  -w /opt/finance_analytics/dbt \
+  prefect-worker \
+  dbt build
 ```
 
-Run only tests:
+### Run Models Only
 
-```bash
-dbt test
+```
+docker exec -it \
+  -w /opt/finance_analytics/dbt \
+  prefect-worker \
+  dbt run
 ```
 
-Generate dbt documentation:
+### Run Tests Only
 
-```bash
-dbt docs generate
-dbt docs serve
 ```
+docker exec -it \
+  -w /opt/finance_analytics/dbt \
+  prefect-worker \
+  dbt test
+```
+
+### Generate Documentation
+
+Generate the documentation artifacts:
+
+```
+docker exec -it \
+  -w /opt/finance_analytics/dbt \
+  prefect-worker \
+  dbt docs generate
+```
+
+The generated documentation is written to:
+
+```
+dbt/target/
+```
+
+Open the generated documentation in a web browser:
+
+```
+dbt/target/index.html
+```
+
+A separate Python installation or virtual environment on the Docker host is
+not required when dbt is executed inside the Prefect Worker container.

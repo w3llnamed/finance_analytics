@@ -16,7 +16,7 @@ seed_categories AS (
     SELECT
         TRIM(real_parent_category) AS parent_category,
         TRIM(real_category) AS category
-    FROM {{ ref('category_mapping') }}
+    FROM {{ ref('category_mapping_demo') }}
 )
 
 SELECT

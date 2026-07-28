@@ -9,7 +9,7 @@
        seed.reserve_expense_tag
        seed.dim_accounts
        seed.dim_accounts_demo
-       seed.category_mapping
+       seed.category_mapping_demo
 
    Description:
        The model mirrors dm.fact_transaction but replaces real accounts and
@@ -68,7 +68,7 @@ mapped AS (
         ON flagged.account = acc_real.account_name
     LEFT JOIN {{ ref('dim_accounts_demo') }} AS acc_demo
         ON acc_real.account_id = acc_demo.account_id
-    LEFT JOIN {{ ref('category_mapping') }} AS cat
+    LEFT JOIN {{ ref('category_mapping_demo') }} AS cat
         ON
             flagged.parent_category = cat.real_parent_category
             AND flagged.category = cat.real_category

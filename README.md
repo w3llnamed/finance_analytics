@@ -23,34 +23,36 @@ Current implementation includes:
 
 ### Data Ingestion
 
-* Automated ingestion pipeline from CSV files through S3 into PostgreSQL
-* Scheduled S3 polling and processing of newly uploaded files
-* Idempotent file processing backed by an ingestion registry
-* Automatic dbt execution after successful data ingestion
+- Automated ingestion pipeline from CSV files through S3 into PostgreSQL
+- Scheduled S3 polling and processing of newly uploaded files
+- Idempotent file processing backed by an ingestion registry
+- Automatic dbt execution after successful data ingestion
 
 ### Data Warehouse
 
-* Layered warehouse architecture with `raw`, `stg`, `core`, `dm`, and `infra` schemas
-* Reusable dbt transformations, data tests, and documentation
-* Analytics-ready data marts for financial reporting
+- Layered warehouse architecture with `raw`, `stg`, `core`, `dm`, and `infra` schemas
+- Reusable dbt transformations, data tests, and documentation
+- Analytics-ready data marts for financial reporting
 
 ### Orchestration and Observability
 
-* Workflow orchestration and scheduling with Prefect
-* Ingestion freshness and file-processing monitoring
-* Historical tracking of dbt model runs and test results
-* Infrastructure-level data quality dashboards
+- Workflow orchestration and scheduling with Prefect
+- Ingestion freshness and file-processing monitoring
+- Historical tracking of dbt model runs and test results
+- Infrastructure-level data quality dashboards
 
 ### Analytics and Deployment
 
-* Interactive BI dashboards built with Apache Superset
-* Containerized local and server deployment with Docker Compose
-* Automated PostgreSQL database, role, and permission initialization
+- Interactive BI dashboards built with Apache Superset
+- Containerized local and server deployment with Docker Compose
+- Automated PostgreSQL database, role, and permission initialization
 
 
 ## Deployment
 
-The platform uses a Docker-based local analytics environment.
+The platform is deployed as a Docker Compose environment.
+
+The same containerized services can be started locally or on a Linux server. However, public server deployment additionally requires host-level configuration such as a firewall, DNS, a reverse proxy and HTTPS.
 
 Current containerized services include:
 
@@ -62,7 +64,7 @@ Current containerized services include:
 - Prefect Services — background Prefect server services
 - Prefect Worker — execution of scheduled ingestion and dbt flows
 
-The PostgreSQL container automatically initializes:
+On the first startup of an empty analytical PostgreSQL volume, bootstrap scripts initialize:
 
 - database roles
 - schemas
@@ -75,11 +77,13 @@ Superset is deployed as a custom Docker image with additional analytical depende
 - `psycopg2-binary`
 - `prophet`
 
-Persistent Docker volumes are used to preserve:
+Persistent Docker volumes preserve:
 
 - PostgreSQL analytical data
 - Superset metadata, users and dashboard configuration
 - Prefect orchestration metadata
+
+**The commands in the Quick Start section describe a local deployment**. Public server deployment is configured separately at the operating-system and reverse-proxy level (`docs/deployment/vps.md`)
 
 
 ## Architecture
@@ -126,11 +130,11 @@ flowchart TB
     INFRA --> BI
 ```
 
-The seed layer contains both public reference data and **private mappings**.
-Public seeds are committed to the repository, while private account and
-category mappings are excluded because they are derived from personal
-financial data. The private seed directory includes tracked example files
-that document the required structure.
+The seed layer contains both public reference data and private user-specific configuration.
+
+Public seeds are committed to the repository, while private seed files are excluded because they contain user-specific financial metadata.
+
+Example templates are provided to document the required structure.
 
 
 ## Tech Stack
@@ -142,7 +146,7 @@ that document the required structure.
 - Apache Superset
 - Docker and Docker Compose
 - S3-compatible object storage (Timeweb S3)
--
+
 
 ## External Storage and Ingestion
 
@@ -243,11 +247,14 @@ represented as explicit zero values.
 This behavior is primarily visible at daily granularity. At higher levels,
 transactions are grouped into weeks, months or years.
 
-Dashboards are optimized for desktop browsers and is designed for a Full HD (1920×1080) viewport.
+Dashboard is optimized for desktop browsers and is designed for a Full HD (1920×1080) viewport.
 
-## Demo Data
 
-The project includes a separate anonymized mart for public demonstration purposes:
+## Optional Demo Environment
+
+**The demo environment is optional and is not required for a private personal deployment.**
+
+The project optionally includes a separate anonymized analytical mart for public demonstration purposes:
 
 - `dm__fact_transaction_demo`
 
@@ -255,21 +262,31 @@ The demo mart is built from the same canonical transaction model as the main ana
 
 The anonymization process includes:
 
-- replacing real account names with demo account names;
-- replacing real categories and parent categories with demo mappings;
-- adjusting transaction amounts using category-level masking coefficients;
-- removing transaction tags and notes;
-- preserving transaction structure, transaction types and analytical flags.
+- replacing real account names with demo account names
+- replacing real categories and parent categories with demo mappings
+- adjusting transaction amounts using category-level masking coefficients
+- removing transaction tags and notes
+- preserving transaction structure, transaction types and analytical flags
 
 This allows the public dashboard to demonstrate the analytical logic and dashboard functionality without exposing personal financial data.
 
 
 ## Requirements
 
-- Docker
-- Docker Compose
-- Python 3.11+
+Required for Docker-based deployment:
+
+- Docker Engine
+- Docker Compose plugin
 - Git
+
+Python, Prefect, dbt and the project runtime dependencies are installed inside
+the Prefect Worker Docker image during the image build.
+
+For development tools and direct execution outside Docker, the host system
+additionally requires:
+
+- Python 3.11+
+- Python virtual environment support
 
 
 ## Environment Setup
@@ -281,70 +298,94 @@ git clone <repo_url>
 cd finance_analytics
 ```
 
-Create Python virtual environment:
+Create the runtime environment file:
+
+```
+cp infra/deploy/.env.example infra/deploy/.env
+```
+
+Open `infra/deploy/.env` and replace all placeholder values with the required
+runtime credentials and configuration.
+
+The `.env` file contains sensitive values, is excluded from version control
+and must not be committed.
+
+Create the required private account seed:
+
+```
+cp dbt/seeds/private/dim_accounts.csv.example \
+   dbt/seeds/private/dim_accounts.csv
+```
+
+Replace the example rows with the required account metadata and opening balances.
+
+To build the optional anonymized demo environment, also create:
+
+```
+cp dbt/seeds/private/category_mapping_demo.csv.example \
+   dbt/seeds/private/category_mapping_demo.csv
+```
+
+The private demo category mapping is required only for the optional demo mart.
+
+The public `dim_accounts_demo.csv` seed is already included in the repository.
+Its `account_id` values must match the identifiers used in the private
+`dim_accounts.csv` file.
+
+### Optional Host Development Environment
+
+A host-level Python virtual environment is not required for Docker-based
+deployment.
+
+It is used only when Python scripts, dbt, Prefect CLI or development tools are
+executed directly on the host instead of inside the Prefect Worker container.
+
+Create the optional development environment:
 
 ```
 python3 -m venv .venv
 source .venv/bin/activate
+pip install -r requirements.txt
 ```
-
-Install Python dependencies:
-
-`pip install -r requirements.txt`
 
 Install the repository pre-commit hooks:
 
-`pre-commit install`
+```
+pre-commit install
+```
 
-The configured hooks check for:
+Run all configured checks:
 
-- accidentally committed secrets;
-- large files;
-- trailing whitespace;
-- missing end-of-file newlines;
-- YAML formatting issues.
+```
+pre-commit run --all-files
+```
 
-All checks can also be run manually:
+### Optional Host dbt Profile
 
+The host-level dbt profile is required only when dbt is executed directly on
+the host:
 
-`pre-commit run --all-files`
+```
+mkdir -p ~/.dbt
+cp dbt/profiles.yml.example ~/.dbt/profiles.yml
+```
 
-Create environment variables file:
-
-`cp infra/deploy/.env.example infra/deploy/.env`
-
-
-Create dbt profile configuration:
-
-`cp dbt/profiles.yml.example ~/.dbt/profiles.yml`
-
-The public dbt profile contains only placeholder credentials for the local
-`dev` target. Production credentials are not hardcoded and are provided
-through environment variables when dbt is executed by the Prefect worker.
-
-When dbt is executed by the Prefect worker, Docker Compose provides the
-database host, port, name and service-role username through environment
-variables. For direct local execution, the profile uses local connection
-defaults defined in `profiles.yml`.
-
-Sensitive environment values are stored in:
-
-`infra/deploy/.env`
-
-The `.env` file is excluded from version control and must not be committed.
-The public `dbt/profiles.yml.example` file contains no secrets.
+When dbt runs inside the Prefect Worker container, database connection values
+are supplied through Docker Compose environment variables.
 
 
 ## Quick Start
 
-Start local infrastructure:
+Complete the environment setup before starting the containers.
+
+Build and start the complete Docker environment:
 
 ```
 cd infra/deploy
-docker compose up -d
+docker compose up -d --build
 ```
 
-The Docker environment starts:
+The command starts:
 
 - PostgreSQL 16
 - Apache Superset
@@ -354,7 +395,12 @@ The Docker environment starts:
 - Prefect Services
 - Prefect Worker
 
-On the first startup of an empty analytical PostgreSQL volume, bootstrap scripts initialize:
+The `--build` option builds or rebuilds the custom Docker images before
+starting the containers. During the Prefect Worker image build, Python project
+dependencies are installed from the repository `requirements.txt` file.
+
+On the first startup of an empty analytical PostgreSQL volume, bootstrap
+scripts initialize:
 
 - database roles
 - schemas
@@ -362,39 +408,75 @@ On the first startup of an empty analytical PostgreSQL volume, bootstrap scripts
 - raw ingestion tables
 - infra monitoring tables
 
-Deploy Prefect flow:
+Check the service status:
 
 ```
-cd ../..
-prefect deploy
+docker compose ps
 ```
 
-The containerized Prefect Worker automatically creates the `finance-process-pool` work pool if necessary and executes scheduled pipeline runs.
+### Deploy the Prefect Flow
 
-For local debugging, the ingestion script can still be executed manually:
+Run the deployment command inside the Prefect Worker container:
 
 ```
-cd ingestion
-python load_money_flow_from_s3.py
+docker exec -it \
+  -w /opt/finance_analytics \
+  prefect-worker \
+  prefect deploy
 ```
 
-The full dbt project requires local private seed files that are excluded
-from version control. Create them from the provided templates:
+The command reads `prefect.yaml` from the project root inside the container
+and creates or updates the Prefect deployment.
+
+The Prefect Worker automatically creates the `finance-process-pool` work pool
+when necessary and polls it for scheduled flow runs.
+
+### Run dbt Manually
+
+Run the full dbt build inside the Prefect Worker container:
+
 ```
-cp dbt/seeds/private/dim_accounts.csv.example \
-   dbt/seeds/private/dim_accounts.csv
-
-cp dbt/seeds/private/category_mapping.csv.example \
-   dbt/seeds/private/category_mapping.csv
+docker exec -it \
+  -w /opt/finance_analytics/dbt \
+  prefect-worker \
+  dbt build
 ```
 
-Launch Superset:
+The working directory is set to `/opt/finance_analytics/dbt` because this is
+where `dbt_project.yml` is located.
 
-`http://localhost:8088`
+### Run Ingestion Manually
 
-Import exported Superset dashboards from:
+Run the ingestion script inside the Prefect Worker container:
 
-`docs/superset_exports/`
+```
+docker exec -it \
+  -w /opt/finance_analytics \
+  prefect-worker \
+  python ingestion/load_money_flow_from_s3.py
+```
+
+### Open the Interfaces
+
+Superset:
+
+```
+http://localhost:8088
+```
+
+Prefect:
+
+```
+http://localhost:4200
+```
+
+Exported Superset assets are stored in:
+
+```
+docs/superset_exports/
+```
+
+Import them through the Superset user interface after the services have started.
 
 
 ## Roadmap
