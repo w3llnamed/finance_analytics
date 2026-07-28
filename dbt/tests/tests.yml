@@ -9,7 +9,7 @@ data_tests:
       Prevents unclassified or unmanaged accounts
       from appearing in downstream analytics.
 
-  - name: assert_core_categories_exist_in_category_mapping
+  - name: assert_core_categories_exist_in_category_mapping_demo
     description: >
       Validates that all distinct category combinations present
       in core__fact_transaction exist in the category_mapping seed.
