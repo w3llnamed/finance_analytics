@@ -1954,19 +1954,18 @@ The build is not successful when the output contains unresolved errors such as:
 
 Fix the reported problem and run `dbt build` again
 
+
 ### 9.5 Verify the Created Schemas
 
 Run:
 
 ```
 docker compose \
-  --env-file infra/deploy/.env \
-  -f infra/deploy/docker-compose.yml \
   exec postgres \
-  psql \
-  -U "$POSTGRES_USER" \
-  -d "$POSTGRES_DB" \
-  -c "\dn"
+  sh -c 'psql \
+    -U "$POSTGRES_USER" \
+    -d "$POSTGRES_DB" \
+    -c "\dn"'
 ```
 
 The output should contain the project schemas created by dbt, including:
@@ -1980,6 +1979,7 @@ infra
 ```
 
 Additional schemas may be present depending on the enabled demo configuration and PostgreSQL initialization scripts
+
 
 ### 9.6 Final Check
 
@@ -1995,3 +1995,672 @@ The warehouse build stage is complete when:
 - no unresolved permission or connection errors remain
 
 The next section restores production data and verifies PostgreSQL roles and Superset metadata
+
+
+
+## 10. Initializing an Empty Environment
+
+This deployment starts with a new PostgreSQL instance
+
+No production database backup or Superset metadata backup is restored
+
+The database structure is created by:
+
+- PostgreSQL initialization scripts
+- dbt seeds
+- dbt models
+- Superset initialization
+
+Business transaction data remains empty until the first successful ingestion run
+
+
+### 10.1 Check the Created Tables
+
+Change directory:
+
+```
+cd /opt/finance_analytics/infra/deploy
+```
+
+Run:
+
+```
+docker compose \
+  exec postgres \
+  sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\dt raw.*"'
+```
+
+Repeat the check for the remaining project schemas:
+
+> [!NOTE] `stg` schema contains only views, so the command below differs: `\dv` instead of `\dt`
+```
+docker compose \
+  exec postgres \
+  sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\dv stg.*"'
+```
+
+```
+docker compose \
+  exec postgres \
+  sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\dt core.*"'
+```
+
+```
+docker compose \
+  exec postgres \
+  sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\dt dm.*"'
+```
+
+```
+docker compose \
+  exec postgres \
+  sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\dt infra.*"'
+```
+
+The exact table list depends on the current dbt project version
+
+
+### 10.2 Check Table Row Counts
+
+Run:
+
+```
+docker compose exec -T postgres \
+  sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL'
+SELECT
+    schemaname,
+    relname AS table_name,
+    n_live_tup AS estimated_rows
+FROM pg_stat_user_tables
+WHERE schemaname IN ('raw', 'stg', 'core', 'dm', 'infra')
+ORDER BY schemaname, relname;
+SQL
+```
+
+> [!NOTE] `stg` schema contains only views, so it won't be shown in result of the command above
+
+The values are PostgreSQL estimates rather than exact row counts
+
+Some tables may contain rows from:
+
+- dbt seeds
+- initialization scripts
+- technical metadata
+- dbt observability models
+
+Business transaction tables may remain empty until ingestion runs successfully
+
+
+### 10.3 Verify Database Roles
+
+Run:
+
+```
+docker compose \
+  exec postgres \
+  sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\du"'
+```
+
+Confirm that the required project roles exist
+
+The exact role names are defined by the runtime configuration and PostgreSQL initialization scripts
+
+The role passwords are not displayed by this command
+
+
+### 10.4 Verify the Fresh Superset Instance
+
+Check the Superset container:
+
+```
+docker compose ps superset
+```
+
+The container should be running and have the `healthy` status.
+
+Verify that the Superset HTTP endpoint is responding:
+
+```
+curl -I http://127.0.0.1:8088/health
+```
+
+The response should include:
+
+```
+HTTP/1.1 200 OK
+```
+
+The Superset instance is initialized from scratch
+
+Because no Superset metadata backup is restored, the previous environment is not transferred automatically
+
+Objects that may need to be recreated or imported include:
+
+- database connections
+- datasets
+- charts
+- dashboards
+- users
+- roles
+- row-level security rules
+
+The exact initialization process depends on the scripts included in the deployment configuration
+
+
+### 10.5 Final Check
+
+The empty environment stage is complete when:
+
+- PostgreSQL is running
+- the required project schemas exist
+- dbt-created tables exist
+- required PostgreSQL roles exist
+- no production database backup was restored
+- no Superset metadata backup was restored
+- Superset starts without unresolved initialization errors
+- the environment is ready for its first ingestion run
+
+The next section publishes Superset through DNS, Caddy and HTTPS
+
+
+
+## 11. Publishing the Platform
+
+This section publishes Apache Superset through a domain name, Caddy reverse proxy and HTTPS
+
+Only Superset will be available from the Internet
+
+PostgreSQL, Redis and Prefect will remain inaccessible through public network interfaces
+
+
+### 11.1 Prepare the Domain
+
+Create an `A` record in the DNS management panel
+
+Use the following values:
+
+- record type `A`
+- host name matching the selected domain or subdomain
+- value matching the public IPv4 address of the VPS
+
+Example:
+
+```
+superset.example.com → 203.0.113.10
+```
+
+Create an `AAAA` record only when the VPS has a working public IPv6 address
+
+An incorrect `AAAA` record can direct part of the traffic to an unavailable address and prevent reliable HTTPS access
+
+Wait until the DNS record becomes available
+
+Check the resolved IPv4 address:
+
+```
+getent ahostsv4 <your-domain>
+```
+
+Replace `<your-domain>` with the real domain name
+
+The returned address must match the public IPv4 address of the VPS
+
+Do not configure Caddy until the domain resolves to the correct server
+
+
+### 11.2 Verify the Superset Port
+
+All commands in this section may be executed from any directory
+
+Check which network interface exposes the Superset port:
+
+```
+sudo ss -lntp | grep ':8088'
+```
+
+The expected address is:
+
+```
+127.0.0.1:8088
+```
+
+This means that Superset accepts connections only from the VPS itself
+
+The following address should not be used for the production deployment:
+
+```
+0.0.0.0:8088
+```
+
+Binding Superset to `0.0.0.0` would expose its internal HTTP port directly to the Internet when the firewall allows it
+
+Verify that Superset responds locally:
+
+```
+curl -I http://127.0.0.1:8088
+```
+
+A successful response may contain:
+
+```
+HTTP/1.1 200 OK
+```
+
+or a redirect such as:
+
+```
+HTTP/1.1 302 FOUND
+```
+
+
+### 11.3 Configure the Firewall
+
+All commands in this section may be executed from any directory
+
+Check the current UFW configuration before making changes:
+
+```
+sudo ufw status verbose
+```
+
+The expected default policies are:
+
+```
+Default: deny (incoming), allow (outgoing), deny (routed)
+```
+
+The policies mean:
+
+- `deny (incoming)` blocks incoming connections unless an explicit allow rule exists
+- `allow (outgoing)` allows the VPS to initiate connections to external services
+- `deny (routed)` prevents the VPS from forwarding traffic between other networks
+
+The `deny (incoming)` policy is what blocks access to all ports that have not been explicitly allowed
+
+Separate deny rules are therefore not required for PostgreSQL, Superset, Prefect or Redis when the default incoming policy is already `deny`
+
+When the required default policies are not configured, set them before enabling UFW:
+
+```
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+```
+
+Before enabling UFW or changing its rules, ensure that SSH access is allowed:
+
+```
+sudo ufw allow 22/tcp comment 'SSH'
+```
+
+This rule must exist before UFW is enabled to avoid losing remote access to the VPS
+
+When SSH is already allowed, UFW may report:
+
+```
+Skipping adding existing rule
+```
+
+This is normal and does not create a duplicate rule
+
+Allow public HTTP traffic:
+
+```
+sudo ufw allow 80/tcp comment 'Caddy HTTP'
+```
+
+Port `80` is required for HTTP requests, automatic redirection to HTTPS and certificate validation by Caddy
+
+Allow public HTTPS traffic:
+
+```
+sudo ufw allow 443/tcp comment 'Caddy HTTPS'
+```
+
+Port `443` is the standard HTTPS port and will be used for encrypted access to Superset through Caddy
+
+Firewall rules only permit traffic to reach a port
+
+They do not cause the VPS to listen on that port and do not start any network service
+
+Caddy will begin listening on ports `80` and `443` only after it is installed and started
+
+Enable UFW only when it is not already active:
+
+```
+sudo ufw enable
+```
+
+The command components are:
+
+- `enable` activates UFW and applies the configured rules
+- existing SSH connections normally remain active when the SSH rule is already present
+
+Do not run this command unnecessarily when the status already shows:
+
+```
+Status: active
+```
+
+Review the resulting configuration:
+
+```
+sudo ufw status verbose
+```
+
+The public rules should include:
+
+```
+22/tcp                     ALLOW IN    Anywhere
+80/tcp                     ALLOW IN    Anywhere
+443/tcp                    ALLOW IN    Anywhere
+```
+
+Equivalent rules may be displayed using the `OpenSSH` application profile instead of `22/tcp`
+
+When IPv6 support is enabled in UFW, corresponding IPv6 rules may also appear:
+
+```
+22/tcp (v6)                ALLOW IN    Anywhere (v6)
+80/tcp (v6)                ALLOW IN    Anywhere (v6)
+443/tcp (v6)               ALLOW IN    Anywhere (v6)
+```
+
+Do not create public allow rules for:
+
+- PostgreSQL port `5432`
+- Superset port `8088`
+- Prefect port `4200`
+- Redis port `6379`
+
+These ports remain blocked by the default `deny (incoming)` policy
+
+Existing monitoring rules or provider-specific rules must remain unchanged
+
+
+### 11.4 Check Ports 80 and 443
+
+Before installing Caddy, check whether another service already uses the required ports:
+
+```
+sudo ss -lntp | grep -E ':(80|443)\s'
+```
+
+No output is expected on a clean server
+
+If another web server is listening on either port, identify and stop it before continuing
+
+Caddy cannot accept public HTTP and HTTPS traffic while another service is using the same ports
+
+
+### 11.5 Install Caddy
+
+All commands in this section may be executed from any directory
+
+Install the packages required by the official Caddy repository:
+
+```
+sudo apt install -y \
+  debian-keyring \
+  debian-archive-keyring \
+  apt-transport-https \
+  curl
+```
+These packages allow APT to download repository data over HTTPS and verify signed packages
+
+Add the Caddy repository signing key:
+
+```
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
+  | sudo gpg --dearmor \
+  -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+```
+
+The public key allows APT to verify that repository metadata and packages were published by the Caddy repository
+
+Add the stable Caddy repository:
+
+```
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
+  | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+```
+
+This file tells APT where to download the stable Caddy package
+
+Allow the package manager to read the repository files:
+
+```
+sudo chmod o+r \
+  /usr/share/keyrings/caddy-stable-archive-keyring.gpg \
+  /etc/apt/sources.list.d/caddy-stable.list
+```
+
+This grants read access to the repository configuration and signing key without allowing other users to modify them
+
+Refresh the package index:
+
+```
+sudo apt update
+```
+
+Install Caddy:
+
+```
+sudo apt install caddy
+```
+
+The official Ubuntu package installs Caddy as a systemd service
+
+Check the service:
+
+```
+sudo systemctl status caddy --no-pager
+```
+
+The expected state is:
+
+```
+Active: active (running)
+```
+
+
+### 11.6 Configure the Reverse Proxy
+
+All commands in this section must be executed from the project root:
+
+```
+/opt/finance_analytics
+```
+
+Move to the project directory:
+
+```
+cd /opt/finance_analytics
+```
+
+The version-controlled Caddy configuration is stored in:
+
+```
+infra/deploy/caddy/Caddyfile
+```
+
+Check its contents:
+
+```
+cat infra/deploy/caddy/Caddyfile
+```
+
+The file should contain:
+
+```
+finance.konstantinmedvedev.com {
+    reverse_proxy 127.0.0.1:8088
+}
+```
+
+Install the prepared configuration as the active system Caddyfile:
+
+```
+sudo install \
+  -o root \
+  -g root \
+  -m 644 \
+  infra/deploy/caddy/Caddyfile \
+  /etc/caddy/Caddyfile
+```
+
+The command components are:
+
+- `install` copies the file and sets its ownership and permissions
+- `-o root` sets `root` as the file owner
+- `-g root` sets `root` as the file group
+- `-m 644` allows the owner to modify the file and all users to read it
+- the first path is the version-controlled source file
+- the second path is the active configuration read by the Caddy systemd service
+
+The file in the repository is the configuration source of truth
+
+The file at `/etc/caddy/Caddyfile` is the active system configuration
+
+Check the installed configuration:
+
+```
+sudo cat /etc/caddy/Caddyfile
+```
+
+The output must match the file stored in the repository
+
+Caddy will:
+
+- accept requests for `finance.konstantinmedvedev.com`
+- redirect HTTP requests to HTTPS
+- obtain and renew the TLS certificate
+- forward requests to Superset on `127.0.0.1:8088`
+
+Superset remains unavailable directly through its internal port
+
+
+### 11.7 Validate the Caddy Configuration
+
+Format the configuration file:
+
+```
+sudo caddy fmt --overwrite /etc/caddy/Caddyfile
+```
+
+Validate the configuration:
+
+```
+sudo caddy validate \
+  --config /etc/caddy/Caddyfile \
+  --adapter caddyfile
+```
+
+A valid configuration should finish without an error
+
+Apply the configuration without stopping the service:
+
+```
+sudo systemctl reload caddy
+```
+
+Check the service state:
+
+```
+sudo systemctl status caddy --no-pager
+```
+
+If Caddy does not start or reload successfully, inspect its logs:
+
+```
+sudo journalctl \
+  -u caddy \
+  --no-pager \
+  -n 100
+```
+
+Common causes include:
+
+- the domain does not resolve to the VPS
+- ports `80` or `443` are blocked
+- another service already uses the required ports
+- the Caddyfile contains an invalid domain or syntax error
+- the DNS provider has an incorrect `AAAA` record
+- certificate issuance limits were reached after repeated failed attempts
+
+### 11.8 Verify HTTPS
+
+Check the HTTP endpoint:
+
+```
+curl -I http://<your-domain>
+```
+
+The response should redirect to HTTPS
+
+Check the HTTPS endpoint:
+
+```
+curl -I https://<your-domain>
+```
+
+A successful Superset response may return:
+
+```
+HTTP/2 200
+```
+
+or a redirect such as:
+
+```
+HTTP/2 302
+```
+
+Open the domain in a browser:
+
+```
+https://<your-domain>
+```
+
+The browser should show:
+
+- a valid HTTPS certificate
+- no certificate warning
+- the Superset login or welcome page
+- the expected domain in the address bar
+
+### 11.9 Keep Prefect Private
+
+Prefect should not be published through Caddy unless public access is explicitly required and separately protected
+
+Access the Prefect interface through an SSH tunnel:
+
+```
+ssh -L 4200:127.0.0.1:4200 <server-user>@<server-address>
+```
+
+Then open:
+
+```
+http://127.0.0.1:4200
+```
+
+The SSH tunnel makes Prefect available only to the authenticated SSH user
+
+### 11.10 Final Check
+
+The platform publishing stage is complete when:
+
+- the domain resolves to the public IPv4 address of the VPS
+- Superset listens only on `127.0.0.1:8088`
+- SSH access remains allowed
+- firewall ports `80` and `443` are open
+- PostgreSQL is not publicly exposed
+- Redis is not publicly exposed
+- Prefect is not publicly exposed
+- Caddy is installed and running
+- the Caddy configuration is valid
+- HTTP redirects to HTTPS
+- the TLS certificate is valid
+- Superset opens through the configured HTTPS domain
+
+The next section performs the final validation of the complete deployment
