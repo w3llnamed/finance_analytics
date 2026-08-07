@@ -1,4 +1,5 @@
-{{ config(severity='error') }}
+-- Verifies that every category combination used by the canonical
+-- transaction model has a corresponding row in category_mapping_demo.
 
 WITH core_categories AS (
     SELECT DISTINCT

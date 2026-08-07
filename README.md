@@ -2,7 +2,37 @@
 
 Personal finance analytics platform built with PostgreSQL, dbt, Python and Superset.
 
-The project implements a layered DWH architecture (`raw → stg → core → dm`), ingestion observability, dbt testing and BI dashboards for financial analysis and data quality monitoring.
+The project implements a layered DWH architecture (`raw - stg - core - dm`), ingestion observability, dbt testing and BI dashboards for financial analysis and data quality monitoring.
+
+
+## Table of Contents
+
+- [Finance Analytics Platform](#finance-analytics-platform)
+  - [Table of Contents](#table-of-contents)
+  - [Project Status](#project-status)
+  - [Features](#features)
+    - [Data Ingestion](#data-ingestion)
+    - [Data Warehouse](#data-warehouse)
+    - [Orchestration and Observability](#orchestration-and-observability)
+    - [Analytics and Deployment](#analytics-and-deployment)
+  - [Deployment](#deployment)
+  - [Architecture](#architecture)
+  - [Tech Stack](#tech-stack)
+  - [External Storage and Ingestion](#external-storage-and-ingestion)
+  - [Project Structure](#project-structure)
+  - [Data Flow](#data-flow)
+  - [Dashboards](#dashboards)
+  - [Optional Demo Environment](#optional-demo-environment)
+  - [Requirements](#requirements)
+  - [Environment Setup](#environment-setup)
+    - [Optional Host Development Environment](#optional-host-development-environment)
+    - [Optional Host dbt Profile](#optional-host-dbt-profile)
+  - [Quick Start](#quick-start)
+    - [Deploy the Prefect Flow](#deploy-the-prefect-flow)
+    - [Run dbt Manually](#run-dbt-manually)
+    - [Run Ingestion Manually](#run-ingestion-manually)
+    - [Open the Interfaces](#open-the-interfaces)
+  - [Roadmap](#roadmap)
 
 
 ## Project Status
@@ -85,6 +115,12 @@ Persistent Docker volumes preserve:
 
 **The commands in the Quick Start section describe a local deployment**. Public server deployment is configured separately at the operating-system and reverse-proxy level (`docs/deployment/vps.md`)
 
+The documented public VPS deployment uses Caddy as a host-level reverse proxy.
+
+Caddy terminates HTTPS connections, manages TLS certificates and forwards
+public requests to Superset on `127.0.0.1:8088`.
+
+Caddy is not part of the Docker Compose stack.
 
 ## Architecture
 
@@ -146,6 +182,7 @@ Example templates are provided to document the required structure.
 - Apache Superset
 - Docker and Docker Compose
 - S3-compatible object storage (Timeweb S3)
+- Caddy — production reverse proxy and automated HTTPS
 
 
 ## External Storage and Ingestion
@@ -247,6 +284,12 @@ represented as explicit zero values.
 This behavior is primarily visible at daily granularity. At higher levels,
 transactions are grouped into weeks, months or years.
 
+Regular and reserve-related expense filters rely on transaction tags configured
+in the `regular_expense_tag.csv` and `reserve_expense_tag.csv` dbt seeds.
+
+Transactions without the corresponding source tags cannot be selected through
+these expense-type filters.
+
 Dashboard is optimized for desktop browsers and is designed for a Full HD (1920×1080) viewport.
 
 
@@ -269,6 +312,27 @@ The anonymization process includes:
 - preserving transaction structure, transaction types and analytical flags
 
 This allows the public dashboard to demonstrate the analytical logic and dashboard functionality without exposing personal financial data.
+
+The demo environment is disabled by default through:
+
+```
+DBT_ENABLE_DEMO=False
+```
+
+When the demo environment is disabled:
+
+- models in dbt/models/04_dm_demo are excluded from the dbt project
+- demo-specific data tests are not executed
+- category_mapping_demo.csv is not required
+- a standard dbt build creates only the private analytical environment
+
+To enable the demo environment, set the following value in `infra/deploy/.env:`
+
+```
+DBT_ENABLE_DEMO=True
+```
+
+When enabled, the demo category mapping seed becomes required and the dbt build validates its completeness before creating the demo mart.
 
 
 ## Requirements
@@ -319,18 +383,31 @@ cp dbt/seeds/private/dim_accounts.csv.example \
 
 Replace the example rows with the required account metadata and opening balances.
 
-To build the optional anonymized demo environment, also create:
+The optional anonymized demo environment is disabled by default.
+
+To enable it, set the following value in `infra/deploy/.env`:
+
+```
+DBT_ENABLE_DEMO=True
+```
+
+Then create the private demo category mapping:
 
 ```
 cp dbt/seeds/private/category_mapping_demo.csv.example \
    dbt/seeds/private/category_mapping_demo.csv
 ```
 
-The private demo category mapping is required only for the optional demo mart.
+Replace the example rows with the required category mappings and masking parameters.
 
 The public `dim_accounts_demo.csv` seed is already included in the repository.
 Its `account_id` values must match the identifiers used in the private
 `dim_accounts.csv` file.
+
+When `DBT_ENABLE_DEMO=False`, the demo models and demo-specific tests are
+excluded from the dbt project and category_mapping_demo.csv is not required.
+
+
 
 ### Optional Host Development Environment
 

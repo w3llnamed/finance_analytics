@@ -1,9 +1,0 @@
-version: 2
-
-macros:
-  - name: test_active_seed_tags_exist_in_raw_tags
-    description: >
-      Validates that all active tags from a seed dictionary
-      exist in the transaction dataset.
-
-      Supports comma-separated tag lists in source data.

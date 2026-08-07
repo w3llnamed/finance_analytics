@@ -320,3 +320,22 @@ The difference is:
 - `down` stops and removes containers and the Compose network;
 - `down` without `-v` preserves named volumes;
 - `down -v` permanently deletes named volumes and their data.
+
+
+## Caddy Reverse Proxy
+
+The production VPS deployment uses Caddy as a host-level reverse proxy.
+
+The version-controlled source configuration is stored in:
+
+`infra/deploy/caddy/Caddyfile`
+
+During server deployment, this file is installed as:
+
+`/etc/caddy/Caddyfile`
+
+Caddy is installed directly on the VPS and is not managed by Docker Compose.
+
+The complete installation, firewall, DNS and HTTPS procedure is documented in:
+
+`docs/deployment/vps.md`

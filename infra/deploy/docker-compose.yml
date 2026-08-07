@@ -1,8 +1,15 @@
+x-logging: &default-logging
+  driver: local
+  options:
+    max-size: "20m"
+    max-file: "5"
+
 services:
   postgres:
     image: postgres:16
     container_name: postgres
     restart: unless-stopped
+    logging: *default-logging
 
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -40,6 +47,7 @@ services:
 
     container_name: superset
     restart: unless-stopped
+    logging: *default-logging
 
     depends_on:
       postgres:
@@ -76,6 +84,7 @@ services:
     image: postgres:16
     container_name: prefect-db
     restart: unless-stopped
+    logging: *default-logging
 
     environment:
       POSTGRES_USER: ${PREFECT_DB_USER}
@@ -100,6 +109,7 @@ services:
     image: redis:7
     container_name: prefect-redis
     restart: unless-stopped
+    logging: *default-logging
 
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -112,8 +122,9 @@ services:
     image: prefecthq/prefect:3-python3.12
     container_name: prefect-server
     restart: unless-stopped
+    logging: *default-logging
 
-    command: prefect server start --host 0.0.0.0
+    command: prefect server start --host 0.0.0.0 --no-services
 
     environment:
       DO_NOT_TRACK: "1"
@@ -150,6 +161,7 @@ services:
     image: prefecthq/prefect:3-python3.12
     container_name: prefect-services
     restart: unless-stopped
+    logging: *default-logging
 
     command: prefect server services start
 
@@ -158,6 +170,11 @@ services:
       PREFECT_MESSAGING_BROKER: prefect_redis.messaging
       PREFECT_MESSAGING_CACHE: prefect_redis.messaging
       PREFECT_REDIS_MESSAGING_HOST: prefect-redis
+
+      PREFECT_SERVER_EVENTS_RETENTION_PERIOD: "P7D"
+      PREFECT_SERVER_SERVICES_DB_VACUUM_ENABLED: "events,flow_runs"
+      PREFECT_SERVER_SERVICES_DB_VACUUM_RETENTION_PERIOD: "P30D"
+      PREFECT_SERVER_SERVICES_DB_VACUUM_LOOP_SECONDS: "86400"
 
     depends_on:
       prefect-db:
@@ -172,6 +189,7 @@ services:
 
     container_name: prefect-worker
     restart: unless-stopped
+    logging: *default-logging
 
     command: >
       bash -c "
@@ -196,6 +214,8 @@ services:
       DBT_DBNAME: ${POSTGRES_DB}
       DBT_USER: dbt_runner
       DBT_RUNNER_PASSWORD: ${DBT_RUNNER_PASSWORD}
+
+      DBT_ENABLE_DEMO: ${DBT_ENABLE_DEMO}
 
     volumes:
       - ../..:/opt/finance_analytics

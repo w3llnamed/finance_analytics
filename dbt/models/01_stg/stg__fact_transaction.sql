@@ -27,7 +27,7 @@
 WITH latest_loaded_batch AS (
 
     SELECT MAX(ingestion_id) AS ingestion_id
-    FROM infra.ingestion_file_registry
+    FROM {{ source('infra', 'ingestion_file_registry') }}
     WHERE
         source_system = 'money_flow_app'
         AND source_object = 'money_flow'

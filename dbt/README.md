@@ -13,7 +13,7 @@ The project follows a layered DWH structure:
 - `01_stg` — technically normalized source data from the latest successful ingestion batch
 - `02_core` — canonical business entities with unified transaction logic, transfer expansion and dimensional enrichment
 - `03_dm` — analytics-ready marts for financial dashboards
-- `04_dm_demo` — public demo data marts containing anonymized and transformed data.
+- `04_dm_demo` — optional public demo data marts containing anonymized and transformed data
 - `90_infra` — observability and platform monitoring models
 
 
@@ -39,6 +39,16 @@ Public seeds included in the repository:
 - `regular_expense_tag.csv` — tags used to identify regular expenses;
 - `reserve_expense_tag.csv` — tags used to identify reserve-related expenses;
 - `dim_accounts_demo.csv` — anonymized account names used by the optional demo mart.
+
+The `regular_expense_tag.csv` and `reserve_expense_tag.csv` seeds define the
+source transaction tags used to classify expenses as regular or reserve-related.
+
+Transactions are assigned to the corresponding analytical groups only when
+their Money Flow tags match a value from the relevant seed.
+
+If these tags are not assigned to transactions in the source application,
+the corresponding dashboard filters cannot identify those transactions as
+regular or reserve-related expenses.
 
 The following private seed is required for a standard project deployment:
 
@@ -77,9 +87,48 @@ The public `dim_accounts_demo.csv` seed is included in version control and norma
 Seeds are loaded into the seed schema.
 
 
+## Optional Demo Configuration
+
+The demo branch is controlled through the following environment variable:
+
+```
+DBT_ENABLE_DEMO
+```
+
+The default configuration is:
+
+```
+DBT_ENABLE_DEMO=False
+```
+
+With this value:
+
+- models in models/04_dm_demo are disabled
+- singular data tests in tests/demo are disabled
+- category_mapping_demo.csv is not required
+- the standard private warehouse can be built with a complete dbt build
+
+To enable the anonymized demo branch, set:
+
+```
+DBT_ENABLE_DEMO=True
+```
+
+The value uses capitalized True and False because it is converted to a
+boolean by the dbt project configuration.
+
+When the demo branch is enabled:
+
+- category_mapping_demo.csv must exist
+- dm_demo models are included in the dbt dependency graph
+- demo-specific data tests are executed
+- missing or invalid category mappings cause the dbt build to fail
+
+
+
 ## Tests
 
-The project uses both schema tests and custom data tests.
+The project uses generic data tests and custom singular data tests.
 
 Test severity is configured by layer:
 
@@ -89,7 +138,32 @@ Test severity is configured by layer:
 - `dm_demo` — warning
 - `infra` — warning
 
-The `core` layer has stricter validation because it represents the canonical business layer used by downstream marts.
+The `core` layer has stricter validation because it represents the canonical
+business layer used by downstream marts.
+
+Demo-specific anonymization tests are stored in:
+
+```
+tests/demo
+```
+
+These tests are enabled only when:
+
+```
+DBT_ENABLE_DEMO=True
+```
+
+They use error severity because incomplete or ambiguous mappings can produce
+an invalid anonymized dataset.
+
+The demo tests validate:
+
+- required values in category_mapping_demo
+- uniqueness of mappings for real category combinations
+- coverage of categories used by the canonical transaction model
+
+Each singular test returns invalid rows and passes only when its query returns
+no records.
 
 
 ## Macros
@@ -105,7 +179,7 @@ Custom macros are used for schema generation and observability logging:
 
 The project logs dbt execution metadata into the `infra` schema using `on-run-end` hooks:
 
-```yaml
+```
 on-run-end:
   - "{{ log_test_results_to_infra() }}"
   - "{{ log_model_runs_to_infra() }}"

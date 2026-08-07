@@ -41,6 +41,7 @@ models:
     04_dm_demo:
       +schema: dm_demo
       +materialized: table
+      +enabled: "{{ env_var('DBT_ENABLE_DEMO', False) | as_bool }}"
 
     90_infra:
       +schema: infra
@@ -62,6 +63,10 @@ data_tests:
 
     90_infra:
       +severity: warn
+
+    demo:
+      +enabled: "{{ env_var('DBT_ENABLE_DEMO', False) | as_bool }}"
+      +severity: error
 
 seeds:
   finance_analytics:

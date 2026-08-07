@@ -117,6 +117,82 @@ It connects to Prefect Server, creates the `finance-process-pool` work pool if
 necessary and continuously polls it for scheduled flow runs.
 
 
+## Accessing the Prefect UI on a VPS
+
+When the platform is deployed on a VPS, the Prefect UI is not exposed to the internet
+
+Inside the Docker network, Prefect is available at:
+
+```
+http://prefect-server:4200
+```
+
+The hostname `prefect-server` is available only to containers connected to the Docker network and cannot be opened directly from the local computer
+
+The Prefect Server port is bound to the VPS loopback interface, so the UI can be accessed securely through an SSH tunnel
+
+Run the following command on the local computer, not on the VPS:
+
+
+ssh -N -L 4200:127.0.0.1:4200 <ssh-host>
+```
+
+Replace `<ssh-host>` with the SSH host alias or address normally used to connect to the VPS
+
+Keep the SSH connection open and navigate to:
+
+```
+http://127.0.0.1:4200
+```
+
+Port `4200` is the default Prefect Server port
+
+The two occurrences of `4200` in the SSH command have different meanings:
+
+* the first `4200` is the port opened on the local computer
+* the second `4200` is the Prefect Server port available on the VPS
+
+The local port can be changed if port `4200` is already in use
+
+For example:
+
+```
+ssh -N -L 14200:127.0.0.1:4200 <ssh-host>
+```
+
+In this case, open:
+
+```
+http://127.0.0.1:14200
+```
+
+If the Prefect Server is configured to use a different port on the VPS, replace the second `4200` with the configured VPS port
+
+The general command format is:
+
+```
+ssh -N -L <local-port>:127.0.0.1:<vps-port> <ssh-host>
+```
+
+To open a specific deployment directly, use its deployment ID:
+
+```
+http://127.0.0.1:4200/deployments/deployment/<deployment-id>
+```
+
+Replace `4200` with the selected local port when a different local port is used
+
+The deployment ID is displayed after running:
+
+```
+docker compose exec prefect-worker prefect deploy --all
+```
+
+Press `Ctrl+C` in the local terminal to close the SSH tunnel
+
+Closing the tunnel only closes local access to the UI and does not stop Prefect Server, Prefect Worker or scheduled flow runs on the VPS
+
+
 ## Docker Integration
 
 Prefect workers are deployed using a dedicated Docker image:

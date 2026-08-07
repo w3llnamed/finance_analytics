@@ -32,7 +32,7 @@ seeds:
 
   - name: reserve_expense_tag
     description: >
-      Defines the tag that marks recurring expenses.
+      Defines the tag that marks reserve expenses.
       Exactly one active record must exist.
       This constraint is validated by a singular dbt test.
     config:
@@ -108,43 +108,6 @@ seeds:
           - not_null
 
       - name: is_credit
-        data_tests:
-          - not_null
-
-  - name: category_mapping_demo
-    description: >
-      Private mapping seed used to transform real transaction categories
-      into anonymized demo categories.
-
-      The seed is stored in seeds/private and is excluded from version control
-      because it contains the mapping key between real and demo category names,
-      as well as amount masking parameters for the demo analytics layer.
-    config:
-      column_types:
-        real_parent_category: varchar(100)
-        real_category: varchar(150)
-        demo_parent_category: varchar(100)
-        demo_category: varchar(150)
-        amount_factor: numeric
-
-    columns:
-      - name: real_parent_category
-        data_tests:
-          - not_null
-
-      - name: real_category
-        data_tests:
-          - not_null
-
-      - name: demo_parent_category
-        data_tests:
-          - not_null
-
-      - name: demo_category
-        data_tests:
-          - not_null
-
-      - name: amount_factor
         data_tests:
           - not_null
 

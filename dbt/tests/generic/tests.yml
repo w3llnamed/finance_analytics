@@ -1,0 +1,42 @@
+version: 2
+
+macros:
+
+  - name: test_active_seed_tags_exist_in_raw_tags
+    description: >
+      Validates that every active tag defined in the seed
+      exists among the tags in raw.money_flow.
+      Helps detect typos, outdated values,
+      or inconsistent tag configuration.
+
+    arguments:
+
+      - name: model
+        type: Relation
+        description: >
+          Seed containing the configured tags.
+
+      - name: column_name
+        type: string
+        description: >
+          Column containing the tag value.
+
+      - name: raw_source_name
+        type: string
+        description: >
+          Name of the dbt source containing raw transaction data.
+
+      - name: raw_table_name
+        type: string
+        description: >
+          Name of the raw source table.
+
+      - name: raw_tags_column
+        type: string
+        description: >
+          Column containing the raw tag values.
+
+      - name: separator
+        type: string
+        description: >
+          Separator used between tags in the raw tags column.

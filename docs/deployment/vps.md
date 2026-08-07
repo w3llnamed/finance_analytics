@@ -1,5 +1,125 @@
 # VPS Deployment Guide
 
+## Table of Contents
+
+- [VPS Deployment Guide](#vps-deployment-guide)
+  - [Table of Contents](#table-of-contents)
+  - [1. Overview](#1-overview)
+    - [1.1 Intended Audience](#11-intended-audience)
+    - [1.2 Prerequisites](#12-prerequisites)
+      - [Ubuntu VPS](#ubuntu-vps)
+      - [GitHub Repository Access](#github-repository-access)
+      - [SSH Key for GitHub](#ssh-key-for-github)
+      - [Runtime Secrets](#runtime-secrets)
+      - [Private dbt Seeds](#private-dbt-seeds)
+      - [Domain Name](#domain-name)
+    - [1.3 Security Principles](#13-security-principles)
+    - [1.3 Deployment Method](#13-deployment-method)
+  - [2. Deployment Architecture](#2-deployment-architecture)
+  - [3. Server Preparation](#3-server-preparation)
+    - [3.1 Check the Ubuntu Version](#31-check-the-ubuntu-version)
+    - [3.2 Check Available Resources](#32-check-available-resources)
+    - [3.3 Update the Package Index](#33-update-the-package-index)
+    - [3.4 Install Available Updates](#34-install-available-updates)
+    - [3.5 Check Whether a Reboot Is Required](#35-check-whether-a-reboot-is-required)
+    - [3.6 Check the System Time](#36-check-the-system-time)
+    - [3.7 Final Check](#37-final-check)
+  - [4. Installing Docker](#4-installing-docker)
+    - [4.1 Remove Conflicting Packages](#41-remove-conflicting-packages)
+    - [4.2 Install Repository Requirements](#42-install-repository-requirements)
+    - [4.3 Add the Docker Signing Key](#43-add-the-docker-signing-key)
+    - [4.4 Add the Official Docker Repository](#44-add-the-official-docker-repository)
+    - [4.5 Install Docker Engine and Docker Compose](#45-install-docker-engine-and-docker-compose)
+    - [4.6 Check the Docker Service](#46-check-the-docker-service)
+    - [4.7 Allow the Current User to Run Docker](#47-allow-the-current-user-to-run-docker)
+    - [4.8 Verify the Installation](#48-verify-the-installation)
+    - [4.9 Final Check](#49-final-check)
+  - [5. Preparing the Project](#5-preparing-the-project)
+    - [5.1 Install Git](#51-install-git)
+    - [5.2 Create the Project Directory](#52-create-the-project-directory)
+    - [5.3 Create a Dedicated GitHub SSH Key](#53-create-a-dedicated-github-ssh-key)
+    - [5.4 Add the Public Key to GitHub](#54-add-the-public-key-to-github)
+    - [5.5 Configure SSH for GitHub](#55-configure-ssh-for-github)
+    - [5.6 Test GitHub Access](#56-test-github-access)
+    - [5.7 Clone the Repository](#57-clone-the-repository)
+    - [5.8 Verify the Repository (skip if u are cloning public repo)](#58-verify-the-repository-skip-if-u-are-cloning-public-repo)
+    - [5.9 Verify the Project Structure](#59-verify-the-project-structure)
+    - [5.10 Updating the Repository Later](#510-updating-the-repository-later)
+    - [5.11 Final Check](#511-final-check)
+  - [6. Runtime Configuration](#6-runtime-configuration)
+    - [6.1 Move to the Project Directory](#61-move-to-the-project-directory)
+    - [6.2 Create the Environment File](#62-create-the-environment-file)
+    - [6.3 Configure Environment Variables](#63-configure-environment-variables)
+    - [6.4 Check for Unchanged Placeholders](#64-check-for-unchanged-placeholders)
+    - [6.5 Create the Required Private dbt Seed](#65-create-the-required-private-dbt-seed)
+    - [6.6 Prepare the Optional Demo Environment](#66-prepare-the-optional-demo-environment)
+    - [6.7 Verify the Required Files](#67-verify-the-required-files)
+    - [6.8 Verify Git Protection](#68-verify-git-protection)
+    - [6.9 Validate the Docker Compose Configuration](#69-validate-the-docker-compose-configuration)
+    - [6.10 Final Check](#610-final-check)
+  - [7. Starting the Platform](#7-starting-the-platform)
+    - [7.1 Start the Docker Compose Stack](#71-start-the-docker-compose-stack)
+    - [7.2 Check Container Status](#72-check-container-status)
+    - [7.3 Review Startup Logs](#73-review-startup-logs)
+    - [7.4 Verify Docker Resource Creation](#74-verify-docker-resource-creation)
+    - [7.5 Final Check](#75-final-check)
+  - [8. Deploying Prefect](#8-deploying-prefect)
+    - [8.1 Check the Prefect Services](#81-check-the-prefect-services)
+    - [8.2 Check the Work Pool](#82-check-the-work-pool)
+    - [8.3 Check Existing Deployments](#83-check-existing-deployments)
+    - [8.4 Create the Deployment](#84-create-the-deployment)
+    - [8.5 Verify the Deployment](#85-verify-the-deployment)
+      - [Access the Prefect UI Through an SSH Tunnel](#access-the-prefect-ui-through-an-ssh-tunnel)
+    - [8.6 Final Check](#86-final-check)
+  - [9. Building the Warehouse](#9-building-the-warehouse)
+    - [9.1 Verify the dbt Project](#91-verify-the-dbt-project)
+    - [9.2 Install dbt Dependencies](#92-install-dbt-dependencies)
+    - [9.3 Build the Warehouse](#93-build-the-warehouse)
+    - [9.4 Review the Build Result](#94-review-the-build-result)
+    - [9.5 Verify the Created Schemas](#95-verify-the-created-schemas)
+    - [9.6 Final Check](#96-final-check)
+  - [10. Initializing an Empty Environment](#10-initializing-an-empty-environment)
+    - [10.1 Check the Created Tables](#101-check-the-created-tables)
+    - [10.2 Check Table Row Counts](#102-check-table-row-counts)
+    - [10.3 Verify Database Roles](#103-verify-database-roles)
+    - [10.4 Verify the Fresh Superset Instance](#104-verify-the-fresh-superset-instance)
+    - [10.5 Final Check](#105-final-check)
+  - [11. Publishing the Platform](#11-publishing-the-platform)
+    - [11.1 Prepare the Domain](#111-prepare-the-domain)
+    - [11.2 Verify the Superset Port](#112-verify-the-superset-port)
+    - [11.3 Configure the Firewall](#113-configure-the-firewall)
+    - [11.4 Check Ports 80 and 443](#114-check-ports-80-and-443)
+    - [11.5 Install Caddy](#115-install-caddy)
+    - [11.6 Configure the Reverse Proxy](#116-configure-the-reverse-proxy)
+    - [11.7 Validate and Apply the Caddy Configuration](#117-validate-and-apply-the-caddy-configuration)
+    - [11.8 Verify HTTPS](#118-verify-https)
+    - [11.9 Keep Prefect Private](#119-keep-prefect-private)
+    - [11.10 Final Check](#1110-final-check)
+  - [12. Final Validation](#12-final-validation)
+    - [12.1 Check the Docker Services](#121-check-the-docker-services)
+    - [12.2 Check Superset Locally](#122-check-superset-locally)
+    - [12.3 Check Superset Through HTTPS](#123-check-superset-through-https)
+    - [12.4 Check Public Port Exposure](#124-check-public-port-exposure)
+    - [12.5 Check Prefect](#125-check-prefect)
+    - [12.6 Check dbt](#126-check-dbt)
+    - [12.7 Check the Database](#127-check-the-database)
+    - [12.8 Import the Superset Dashboards](#128-import-the-superset-dashboards)
+    - [12.9 Check the Superset Interface](#129-check-the-superset-interface)
+    - [12.10 Check Caddy](#1210-check-caddy)
+    - [12.11 Final Check](#1211-final-check)
+  - [13. Backup Strategy](#13-backup-strategy)
+    - [13.1 Data That Must Be Backed Up](#131-data-that-must-be-backed-up)
+    - [13.2 Create the Backup Directory](#132-create-the-backup-directory)
+    - [13.3 Back Up the Analytical Database](#133-back-up-the-analytical-database)
+    - [13.4 Back Up Superset Metadata](#134-back-up-superset-metadata)
+    - [13.5 Back Up Prefect Metadata](#135-back-up-prefect-metadata)
+    - [13.6 Back Up Runtime Configuration](#136-back-up-runtime-configuration)
+    - [13.7 Create Backup Checksums](#137-create-backup-checksums)
+    - [13.8 Copy the Backup Outside the VPS](#138-copy-the-backup-outside-the-vps)
+    - [13.9 Protect the S3 Source Data](#139-protect-the-s3-source-data)
+    - [13.10 Recommended Backup Frequency](#1310-recommended-backup-frequency)
+    - [13.11 Final Check](#1311-final-check)
+
 
 
 ## 1. Overview
@@ -16,10 +136,9 @@ It covers the complete server deployment process, including:
 - building and starting the Docker Compose environment
 - deploying the Prefect flow
 - building and testing the dbt project
-- restoring PostgreSQL and Superset data from backups
 - configuring a domain, firewall, Caddy reverse proxy and HTTPS
 - validating the complete production environment
-- creating and restoring backups
+- creating backups
 
 After completing this guide, the server will run the following containerized services:
 
@@ -72,6 +191,13 @@ The server must provide:
 - administrative privileges through `root` or `sudo`
 - a public IPv4 or\and IPv6 address
 - enough CPU, memory and disk space for the Docker Compose services
+
+
+Minimum recommended resources:
+
+- **CPU:** 2 vCPUs
+- **Memory:** 4 GB RAM
+- **Storage:** 40 GB SSD
 
 
 Recommended resources:
@@ -144,7 +270,13 @@ These files contain user-specific mappings and are excluded from version control
 
 Public `.example` files are included in the repository and document the required structure.
 
-The standard deployment requires `dim_accounts.csv`, while the additional category mapping is needed only when the optional demo environment is reproduced.
+The standard deployment requires `dim_accounts.csv`.
+
+The demo environment is disabled by default through
+`DBT_ENABLE_DEMO=False`.
+
+`category_mapping_demo.csv` is required only when the environment is configured
+with `DBT_ENABLE_DEMO=True`.
 
 
 #### Domain Name
@@ -1050,7 +1182,7 @@ cd /opt/finance_analytics
 ```
 
 
-### 5.8 Verify the Repository
+### 5.8 Verify the Repository (skip if u are cloning public repo)
 
 Check the current repository state:
 
@@ -1245,6 +1377,28 @@ A variable should normally use this format:
 VARIABLE_NAME=value
 ```
 
+The optional demo environment is controlled by:
+
+```
+DBT_ENABLE_DEMO
+```
+
+Keep the default value for a standard private deployment:
+
+DBT_ENABLE_DEMO=False
+
+Set the following value only when the anonymized demo mart is required:
+
+```
+DBT_ENABLE_DEMO=True
+```
+
+Use capitalized True and False.
+
+When the value changes after the containers have already been created, the
+prefect-worker container must be recreated so that it receives the updated
+environment variable.
+
 Generate Strong Passwords
 
 Production passwords can be generated directly on the server using the Linux cryptographic random number generator
@@ -1315,9 +1469,20 @@ Its account identifiers must match the account values used by the source data an
 Do not change the CSV header unless the project model and template are updated at the same time
 
 
-### 6.6 Prepare the Optional Demo Seed
+### 6.6 Prepare the Optional Demo Environment
 
-**Skip this step when the public demo environment is not required**
+**Skip this step when `DBT_ENABLE_DEMO=False`**
+
+The disabled demo configuration excludes the demo models and demo-specific
+tests from the dbt project. In this mode,
+`dbt/seeds/private/category_mapping_demo.csv` is not required.
+
+To enable the demo environment, set the following value in
+`infra/deploy/.env`:
+
+```
+DBT_ENABLE_DEMO=True
+```
 
 Create the private demo category mapping:
 
@@ -1328,23 +1493,27 @@ cp dbt/seeds/private/category_mapping_demo.csv.example \
 
 Open the file:
 
-```
-nano dbt/seeds/private/category_mapping_demo.csv
-```
+`nano dbt/seeds/private/category_mapping_demo.csv`
 
-Replace the example rows with the required category mappings and masking parameters
+Replace the example rows with the required category mappings and masking
+parameters.
 
 The public demo account seed is already included in the repository:
 
-```
-dbt/seeds/private/dim_accounts_demo.csv
-```
+`dbt/seeds/private/dim_accounts_demo.csv`
 
 Its account identifiers must remain consistent with the identifiers in:
 
-```
-dbt/seeds/private/dim_accounts.csv
-```
+`dbt/seeds/private/dim_accounts.csv`
+
+When the demo environment is enabled, dbt tests verify that:
+
+required mapping values are populated
+real category mappings are unique
+all categories used by the canonical transaction model are mapped
+
+These checks use error severity and must pass before the demo mart is considered
+valid.
 
 
 ### 6.7 Verify the Required Files
@@ -1367,7 +1536,7 @@ For a standard private deployment, the following file must exist:
 dbt/seeds/private/dim_accounts.csv
 ```
 
-For the optional demo environment, the following files must also exist:
+When `DBT_ENABLE_DEMO=True`, the following files must also exist:
 
 ```
 dbt/seeds/private/dim_accounts_demo.csv
@@ -1443,7 +1612,8 @@ Runtime configuration is complete when:
 - every placeholder in `.env` has been reviewed
 - `.env` permissions are restricted
 - `dbt/seeds/private/dim_accounts.csv` contains the required account data
-- optional demo seed files are prepared when needed
+- `DBT_ENABLE_DEMO` is set to the intended value
+- optional demo seed files are prepared when `DBT_ENABLE_DEMO=True`
 - private files are ignored by Git
 - Docker Compose configuration validation finishes without errors
 
@@ -1978,7 +2148,14 @@ dm
 infra
 ```
 
-Additional schemas may be present depending on the enabled demo configuration and PostgreSQL initialization scripts
+When `DBT_ENABLE_DEMO=True`, the output should also contain:
+
+```
+dm_demo
+```
+
+When `DBT_ENABLE_DEMO=False`, the `dm_demo` schema and its models are not
+required.
 
 
 ### 9.6 Final Check
@@ -1993,6 +2170,8 @@ The warehouse build stage is complete when:
 - dbt tests pass
 - the expected PostgreSQL schemas exist
 - no unresolved permission or connection errors remain
+- the `dm_demo` models and demo-specific tests are excluded when `DBT_ENABLE_DEMO=False`
+- the `dm_demo` schema exists and demo-specific tests pass when `DBT_ENABLE_DEMO=True`
 
 The next section restores production data and verifies PostgreSQL roles and Superset metadata
 
@@ -2286,11 +2465,25 @@ sudo ufw default deny incoming
 sudo ufw default allow outgoing
 ```
 
-Before enabling UFW or changing its rules, ensure that SSH access is allowed:
+Before enabling UFW or changing its rules, determine which port is used by the SSH server:
 
 ```
-sudo ufw allow 22/tcp comment 'SSH'
+sudo sshd -T | grep '^port '
 ```
+
+The expected output contains the effective SSH port, for example:
+
+```
+port 22
+```
+
+Allow incoming connections to the actual SSH port:
+
+```
+sudo ufw allow <ssh-port>/tcp comment 'SSH'
+```
+
+Replace <ssh-port> with the value returned by the previous command
 
 This rule must exist before UFW is enabled to avoid losing remote access to the VPS
 
@@ -2492,7 +2685,7 @@ cat infra/deploy/caddy/Caddyfile
 The file should contain:
 
 ```
-finance.konstantinmedvedev.com {
+<your domain> {
     reverse_proxy 127.0.0.1:8088
 }
 ```
@@ -2508,17 +2701,6 @@ sudo install \
   /etc/caddy/Caddyfile
 ```
 
-The command components are:
-
-- `install` copies the file and sets its ownership and permissions
-- `-o root` sets `root` as the file owner
-- `-g root` sets `root` as the file group
-- `-m 644` allows the owner to modify the file and all users to read it
-- the first path is the version-controlled source file
-- the second path is the active configuration read by the Caddy systemd service
-
-The file in the repository is the configuration source of truth
-
 The file at `/etc/caddy/Caddyfile` is the active system configuration
 
 Check the installed configuration:
@@ -2531,7 +2713,7 @@ The output must match the file stored in the repository
 
 Caddy will:
 
-- accept requests for `finance.konstantinmedvedev.com`
+- accept requests for `<your domain>`
 - redirect HTTP requests to HTTPS
 - obtain and renew the TLS certificate
 - forward requests to Superset on `127.0.0.1:8088`
@@ -2539,15 +2721,13 @@ Caddy will:
 Superset remains unavailable directly through its internal port
 
 
-### 11.7 Validate the Caddy Configuration
+### 11.7 Validate and Apply the Caddy Configuration
 
-Format the configuration file:
+All commands in this section may be executed from any directory
 
-```
-sudo caddy fmt --overwrite /etc/caddy/Caddyfile
-```
+The active configuration must not be edited directly because the version-controlled file in `infra/deploy/caddy/Caddyfile` is the source of truth
 
-Validate the configuration:
+Validate the installed configuration before applying it:
 
 ```
 sudo caddy validate \
@@ -2555,21 +2735,39 @@ sudo caddy validate \
   --adapter caddyfile
 ```
 
+The command components are:
+
+- `caddy validate` loads and checks the configuration without applying it
+- `--config` specifies the configuration file
+- `--adapter caddyfile` specifies that the file uses Caddyfile syntax
+
 A valid configuration should finish without an error
 
-Apply the configuration without stopping the service:
+Do not reload Caddy when validation fails
+
+Apply the validated configuration without stopping the service:
 
 ```
 sudo systemctl reload caddy
 ```
 
+The `reload` command makes the running Caddy service load the new configuration without a full restart
+
+After the reload, Caddy will begin serving the configured domain and attempt to obtain a TLS certificate
+
 Check the service state:
 
 ```
-sudo systemctl status caddy --no-pager
+sudo systemctl status caddy --no-pager -l
 ```
 
-If Caddy does not start or reload successfully, inspect its logs:
+The expected state is:
+
+```
+Active: active (running)
+```
+
+If validation, reload or certificate issuance fails, inspect the service logs:
 
 ```
 sudo journalctl \
@@ -2580,12 +2778,13 @@ sudo journalctl \
 
 Common causes include:
 
-- the domain does not resolve to the VPS
+- the domain does not resolve to the public IPv4 address of the VPS
 - ports `80` or `443` are blocked
-- another service already uses the required ports
+- another service already uses ports `80` or `443`
 - the Caddyfile contains an invalid domain or syntax error
 - the DNS provider has an incorrect `AAAA` record
 - certificate issuance limits were reached after repeated failed attempts
+
 
 ### 11.8 Verify HTTPS
 
@@ -2664,3 +2863,950 @@ The platform publishing stage is complete when:
 - Superset opens through the configured HTTPS domain
 
 The next section performs the final validation of the complete deployment
+
+
+
+## 12. Final Validation
+
+This section verifies that the complete platform is running correctly after deployment
+
+Run the commands from:
+
+```
+cd /opt/finance_analytics/infra/deploy
+```
+
+
+### 12.1 Check the Docker Services
+
+Run:
+
+```
+docker compose ps
+```
+
+Confirm that the required services are running:
+
+- PostgreSQL
+- Superset
+- Prefect database
+- Prefect Server
+- Prefect services
+- Prefect Worker
+- Redis
+
+Services with configured health checks should display:
+
+```
+healthy
+```
+
+The deployment is not ready when a required container is:
+
+```
+Exited
+Restarting
+Unhealthy
+```
+
+
+### 12.2 Check Superset Locally
+
+Run:
+
+```
+curl -I http://127.0.0.1:8088/health
+```
+
+The expected result is:
+
+```
+HTTP/1.1 200 OK
+```
+
+This confirms that Superset is responding directly on the VPS before traffic passes through Caddy
+
+
+### 12.3 Check Superset Through HTTPS
+
+Run:
+
+```
+curl -I https://<your-domain>/health
+```
+
+Replace `<your-domain>` with the configured domain
+
+The expected result is:
+
+```
+HTTP/2 200
+```
+
+The exact HTTP version may differ
+
+A successful response confirms that:
+
+- DNS resolves correctly
+- port `443` is reachable
+- Caddy is running
+- the TLS certificate is valid
+- the reverse proxy reaches Superset
+
+Also check the HTTP redirect:
+
+```
+curl -I http://<your-domain>
+```
+
+The response should redirect to HTTPS
+
+
+### 12.4 Check Public Port Exposure
+
+Run:
+
+```
+sudo ss -lntp | grep -E ':(80|443|4200|5432|6379|8088)\s'
+```
+
+The expected public ports are:
+
+- `80` for HTTP redirect and certificate validation
+- `443` for HTTPS
+
+The internal services should not listen on all network interfaces
+
+Expected loopback bindings include:
+
+```
+127.0.0.1:4200
+127.0.0.1:5432
+127.0.0.1:8088
+```
+
+Redis should remain inside the Docker network and should not be published on the VPS
+
+The following bindings should not appear:
+
+```
+0.0.0.0:4200
+0.0.0.0:5432
+0.0.0.0:6379
+0.0.0.0:8088
+```
+
+
+### 12.5 Check Prefect
+
+Check the Prefect services:
+
+```
+docker compose ps prefect-server prefect-services prefect-worker
+```
+
+Check the work pool:
+
+```
+docker compose exec prefect-worker prefect work-pool ls
+```
+
+Check the deployment:
+
+```
+docker compose exec prefect-worker prefect deployment ls
+```
+
+The output should contain:
+
+```
+money-flow-ingestion
+```
+
+Check the worker logs:
+
+```
+docker compose logs --tail=50 prefect-worker
+```
+
+The logs should confirm that the worker is connected to the Prefect API and polling the expected work pool
+
+
+### 12.6 Check dbt
+
+Run:
+
+```
+docker compose \
+  exec \
+  -w /opt/finance_analytics/dbt \
+  prefect-worker \
+  dbt debug
+```
+
+The expected result is:
+
+```
+All checks passed
+```
+
+Run the complete project validation:
+
+```
+docker compose \
+  exec \
+  -w /opt/finance_analytics/dbt \
+  prefect-worker \
+  dbt build
+```
+
+The final summary should contain:
+
+```
+ERROR=0
+```
+
+
+### 12.7 Check the Database
+
+Run:
+
+```
+docker compose \
+  exec postgres \
+  sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\dn"'
+```
+
+Confirm that the expected schemas exist:
+
+```
+raw
+stg
+core
+dm
+infra
+```
+
+When the demo environment is enabled, also confirm that the following schema
+exists:
+
+```
+dm_demo
+```
+
+Check the project tables:
+
+```
+docker compose exec -T postgres \
+  sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL'
+SELECT
+    schemaname,
+    relname AS table_name,
+    n_live_tup AS estimated_rows
+FROM pg_stat_user_tables
+WHERE schemaname IN ('raw', 'stg', 'core', 'dm', 'dm_demo', 'infra')
+ORDER BY schemaname, relname;
+SQL
+```
+
+The database may contain only seed data, technical metadata and empty business tables until the first ingestion run
+
+
+### 12.8 Import the Superset Dashboards
+
+When Superset is initialized from scratch, dashboards, charts, datasets and permissions are not created automatically
+
+Export the required dashboards from the existing Superset instance
+
+In the existing Superset interface:
+
+- open the dashboard list
+- select the required dashboard
+- use the dashboard export action
+- save the generated ZIP archive
+- do not extract the archive
+
+Repeat the export for each required dashboard when they are stored in separate archives
+
+The exported archive may contain:
+
+- the dashboard
+- associated charts
+- associated datasets
+- database connection definitions
+
+The archive does not contain the business data stored in PostgreSQL
+
+Open the deployed Superset instance:
+
+```
+https://<your-domain>
+```
+
+Sign in using an administrator account
+
+Open the dashboard list and use the dashboard import action
+
+Upload the exported ZIP archive directly from the local computer
+
+The archive does not need to be:
+
+- added to the repository
+- copied to the VPS
+- copied into the Superset container
+- extracted manually
+
+When requested during the import:
+
+- provide the passwords for the database connections used by the imported datasets
+- enable overwrite only when replacing previously imported Superset assets
+
+After the import, open the database connection settings
+
+Verify that the imported connections use the Docker service hostname:
+
+```
+postgres
+```
+
+The deployed Superset instance should not connect to PostgreSQL through:
+
+```
+localhost
+127.0.0.1
+```
+
+Test each required database connection
+
+Verify that:
+
+- the production dashboard uses the production database connection
+- the demonstration dashboard uses the demonstration database connection when the optional demo environment is enabled
+- the imported datasets reference the expected schemas and tables
+- the required roles have access to the imported dashboards and datasets
+- the dashboards are published when they must be available to non-administrator users
+
+
+### 12.9 Check the Superset Interface
+
+Open:
+
+```
+https://<your-domain>
+```
+
+Verify:
+
+- the page opens without a certificate warning
+- the Superset login page is available
+- authentication works
+- the required database connections are available
+- all required database connection tests pass
+- the expected datasets are available
+- the imported dashboards appear in the dashboard list
+- the dashboards open without unresolved errors
+- charts load successfully
+- filters and dashboard controls work
+- the browser does not show mixed-content warnings
+- the required users and roles have the expected access
+
+If the dashboards have not yet been imported, complete the dashboard import before considering this check successful
+
+### 12.10 Check Caddy
+
+Run:
+
+```
+sudo systemctl status caddy --no-pager
+```
+
+The expected state is:
+
+```
+Active: active (running)
+```
+
+Check recent logs:
+
+```
+sudo journalctl \
+  -u caddy \
+  --no-pager \
+  -n 50
+```
+
+The logs should not contain unresolved certificate, DNS or reverse proxy errors
+
+
+### 12.11 Final Check
+
+The deployment is complete when:
+
+- all required Docker containers are running
+- configured container health checks pass
+- Superset returns `200 OK` locally
+- Superset is available through HTTPS
+- HTTP redirects to HTTPS
+- the TLS certificate is valid
+- PostgreSQL is not publicly exposed
+- Redis is not publicly exposed
+- Prefect is not publicly exposed
+- the Prefect worker is connected
+- the required work pool exists
+- `money-flow-ingestion` is registered
+- `dbt debug` passes
+- `dbt build` finishes with `ERROR=0`
+- the expected database schemas and tables exist
+- the required Superset dashboards are imported
+- the required database connections are configured
+- the required datasets are available
+- the Superset interface opens correctly
+- the dashboards load without unresolved errors
+- the charts load successfully
+- the required users and roles have the expected access
+- Caddy is running without unresolved errors
+
+The next section defines the backup and recovery strategy
+
+
+
+## 13. Backup Strategy
+
+This section creates the initial backup of the deployed platform
+
+The backup must be stored outside the VPS
+
+A backup stored only on the same server does not protect against:
+
+- VPS deletion
+- disk failure
+- filesystem corruption
+- provider failure
+- accidental removal of Docker volumes
+- loss of access to the server
+
+The deployment uses three persistent Docker volumes:
+
+- `postgres_data` for the analytical PostgreSQL database
+- `superset_home` for Superset metadata, users and dashboards
+- `prefect_db_data` for Prefect orchestration metadata
+
+The exact Docker volume names may include a Compose project prefix
+
+A complete restoration procedure can be documented separately as an operational runbook
+
+During the initial deployment it is sufficient to:
+
+- create the required backups
+- verify that the dump files and archives are readable
+- create checksums
+- copy the backup outside the VPS
+- verify the external copy
+
+
+### 13.1 Data That Must Be Backed Up
+
+The backup must include:
+
+- analytical PostgreSQL database
+- Superset metadata
+- `infra/deploy/.env`
+- private dbt seeds
+- any other files intentionally excluded from Git
+
+Prefect metadata should also be backed up when the following data must be preserved:
+
+- flow run history
+- task run history
+- schedules created through the Prefect API or interface
+- work pool configuration
+- orchestration state
+
+The Prefect deployment itself can be recreated from:
+
+```
+prefect.yaml
+```
+
+The following files are stored in Git and do not require a separate backup:
+
+- application source code
+- Docker Compose configuration
+- Dockerfiles
+- dbt models
+- Prefect flow code
+- Caddy configuration
+- public Superset exports stored in the repository
+
+The following objects normally do not require a backup:
+
+- Docker images
+- containers
+- Docker networks
+- Redis cache
+- generated dbt packages
+- temporary files
+- Caddy TLS certificates
+
+Docker images can be downloaded or rebuilt
+
+Containers and Docker networks can be recreated from the Docker Compose configuration
+
+Caddy can request new TLS certificates after the domain is pointed to the restored server
+
+
+### 13.2 Create the Backup Directory
+
+Run the commands in this section from the project root:
+
+```
+/opt/finance_analytics
+```
+
+Move into the project directory:
+
+```
+cd /opt/finance_analytics
+```
+
+Create a protected backup directory:
+
+```
+sudo install \
+  -d \
+  -m 0700 \
+  -o "$USER" \
+  -g "$USER" \
+  /var/backups/finance_analytics
+```
+
+Create a separate directory for the current backup:
+
+```
+BACKUP_DIR="/var/backups/finance_analytics/$(date -u +%Y%m%dT%H%M%SZ)"
+mkdir -p "$BACKUP_DIR"
+```
+
+Display the created path:
+
+```
+echo "$BACKUP_DIR"
+```
+
+The timestamp uses UTC and produces a directory similar to:
+
+```
+/var/backups/finance_analytics/20260730T100000Z
+```
+
+Run the remaining backup commands in the same terminal session so the `BACKUP_DIR` variable remains available
+
+
+### 13.3 Back Up the Analytical Database
+
+Create a logical PostgreSQL backup:
+
+```
+docker compose \
+  --env-file infra/deploy/.env \
+  -f infra/deploy/docker-compose.yml \
+  exec -T postgres \
+  sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' \
+  > "$BACKUP_DIR/postgres.dump"
+```
+
+The custom PostgreSQL dump format provides:
+
+- compressed storage
+- selective restoration
+- restoration through `pg_restore`
+- verification without restoring the database
+
+Verify that the dump can be read:
+
+```
+cat "$BACKUP_DIR/postgres.dump" \
+  | docker compose \
+      --env-file infra/deploy/.env \
+      -f infra/deploy/docker-compose.yml \
+      exec -T postgres \
+      pg_restore --list \
+  > /dev/null
+```
+
+No output is expected when the dump is readable
+
+Verify that the file is not empty:
+
+```
+ls -lh "$BACKUP_DIR/postgres.dump"
+```
+
+
+### 13.4 Back Up Superset Metadata
+
+Superset metadata includes:
+
+- users
+- roles and permissions
+- database connections
+- datasets
+- charts
+- dashboards
+- dashboard configuration
+- row-level security rules
+
+Superset is stopped briefly to prevent its metadata database from changing during the copy
+
+Stop Superset:
+
+```
+docker compose \
+  --env-file infra/deploy/.env \
+  -f infra/deploy/docker-compose.yml \
+  stop superset
+```
+
+Get the Superset container identifier:
+
+```
+SUPERSET_CONTAINER=$(
+  docker compose \
+    --env-file infra/deploy/.env \
+    -f infra/deploy/docker-compose.yml \
+    ps -aq superset
+)
+```
+
+Verify that the identifier was found:
+
+```
+echo $SUPERSET_CONTAINER
+```
+
+Expected result looks like: `1654ac65bf3058fd9ccb863f9dc083bbb1b6d7a00080a86225e0607875459011`
+
+Create a temporary directory:
+
+```
+mkdir -p "$BACKUP_DIR/superset_home"
+```
+
+Ensure that temporary directory was successfully created:
+
+```
+ls -ld "$BACKUP_DIR/superset_home"
+```
+
+Copy the Superset persistent directory:
+
+```
+docker cp \
+  "$SUPERSET_CONTAINER":/app/superset_home/. \
+  "$BACKUP_DIR/superset_home"
+```
+
+Expected return: `Successfully copied ...`
+
+Create the archive:
+
+```
+tar \
+  -czf "$BACKUP_DIR/superset_home.tar.gz" \
+  -C "$BACKUP_DIR/superset_home" \
+  .
+```
+
+Remove the temporary directory:
+
+```
+rm -rf "$BACKUP_DIR/superset_home"
+```
+
+Start Superset:
+
+```
+docker compose \
+  --env-file infra/deploy/.env \
+  -f infra/deploy/docker-compose.yml \
+  start superset
+```
+
+Verify that the archive can be read:
+
+```
+tar -tzf "$BACKUP_DIR/superset_home.tar.gz" > /dev/null
+```
+
+There will be no return if archive can be read.
+
+
+Check the Superset health endpoint:
+
+```
+curl -I http://127.0.0.1:8088/health
+```
+
+The expected response includes:
+
+```
+HTTP/1.1 200 OK
+```
+
+
+### 13.5 Back Up Prefect Metadata
+
+Prefect metadata contains:
+
+- deployments
+- schedules
+- work pool configuration
+- flow run history
+- task run history
+- orchestration state
+
+**This backup is recommended but may be omitted when Prefect history and server-side configuration do not need to be preserved**
+
+Create the Prefect database backup:
+
+```
+docker compose \
+  --env-file infra/deploy/.env \
+  -f infra/deploy/docker-compose.yml \
+  exec -T prefect-db \
+  sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' \
+  > "$BACKUP_DIR/prefect.dump"
+```
+
+Verify that the dump can be read:
+
+```
+cat "$BACKUP_DIR/prefect.dump" \
+  | docker compose \
+      --env-file infra/deploy/.env \
+      -f infra/deploy/docker-compose.yml \
+      exec -T prefect-db \
+      pg_restore --list \
+  > /dev/null
+```
+
+Verify that the file is not empty:
+
+```
+ls -lh "$BACKUP_DIR/prefect.dump"
+```
+
+When this backup is omitted, the deployment can be recreated from `prefect.yaml`
+
+
+### 13.6 Back Up Runtime Configuration
+
+Create an archive containing the local files containig secrets:
+
+```
+tar \
+  --exclude='dbt/seeds/private/*.example' \
+  --exclude='dbt/seeds/private/README.md' \
+  -czf "$BACKUP_DIR/runtime_config.tar.gz" \
+  -C /opt/finance_analytics \
+  infra/deploy/.env \
+  dbt/seeds/private
+```
+
+Check archive content:
+
+```
+tar -tzf "$BACKUP_DIR/runtime_config.tar.gz"
+```
+
+The archive contains credentials and private data including:
+
+- database credentials
+- `SUPERSET_SECRET_KEY`
+- S3 credentials
+- other runtime variables stored in `.env`
+- private dbt seeds
+
+Restrict access to the created backup files:
+
+```
+chmod 600 "$BACKUP_DIR"/*
+```
+
+Verify the permissions:
+
+```
+ls -la "$BACKUP_DIR"
+```
+
+The runtime archive must be stored only in encrypted or access-controlled storage
+
+
+### 13.7 Create Backup Checksums
+
+Move into the backup directory:
+
+```
+cd "$BACKUP_DIR"
+```
+
+Create checksums for the required backup files:
+
+```
+sha256sum \
+  postgres.dump \
+  superset_home.tar.gz \
+  runtime_config.tar.gz \
+  > SHA256SUMS
+```
+
+Add the Prefect dump when it was created:
+
+```
+if [ -f prefect.dump ]; then
+  sha256sum prefect.dump >> SHA256SUMS
+fi
+```
+
+Verify the backup files:
+
+```
+sha256sum --check SHA256SUMS
+```
+
+Every listed file should return:
+
+```
+OK
+```
+
+Restrict access to the checksum file:
+
+```
+chmod 600 SHA256SUMS
+```
+
+
+### 13.8 Copy the Backup Outside the VPS
+
+Copy the complete timestamped directory to storage that is independent of the VPS
+
+Suitable destinations include:
+
+- S3-compatible object storage
+- another VPS
+- encrypted local storage
+- a dedicated backup service
+
+Do not delete the local backup until the external copy has been verified
+
+The external backup location should provide:
+
+- restricted access
+- encryption
+- versioning when available
+- lifecycle or retention rules
+- protection against accidental deletion
+
+When copying the backup to a local computer, run a command similar to the following from the **local computer**:
+
+When an SSH host alias is configured, use:
+
+```
+scp -r \
+  <host-alias>:/var/backups/finance_analytics/<backup-directory> .
+```
+
+When no SSH host alias is configured, specify the remote username and server address directly:
+
+```
+scp -r \
+  <ssh-user>@<server-address>:/var/backups/finance_analytics/<backup-directory> \
+  .
+```
+
+Replace `<backup-directory>` with the timestamped directory created during the backup
+
+Example:
+
+```
+20260730T100000Z
+```
+
+Verify the downloaded copy from Linux or WSL:
+
+```
+cd <backup-directory>
+sha256sum --check SHA256SUMS
+```
+
+Every listed file should return:
+
+```
+OK
+```
+
+The backup is not complete until at least one verified copy exists outside the VPS
+
+
+### 13.9 Protect the S3 Source Data
+
+The project S3 bucket is already stored outside the VPS and is not included in the local VPS backup
+
+When the bucket contains source files that cannot be downloaded again, configure the object storage to reduce the risk of data loss
+
+Recommended protections include:
+
+- bucket versioning
+- restricted deletion permissions
+- lifecycle rules that do not remove required source data
+- a separate copy or replication when the source data is critical
+
+VPS backups and S3 protection cover different failure scenarios
+
+A PostgreSQL backup does not replace protection of the original files stored in S3
+
+
+### 13.10 Recommended Backup Frequency
+
+A practical backup schedule for this deployment is:
+
+- analytical PostgreSQL backup every day when data changes regularly
+- Superset metadata backup after dashboard, dataset or permission changes
+- Prefect metadata backup every week when run history must be preserved
+- runtime configuration backup after credential or private seed changes
+- complete backup before platform upgrades
+- complete backup before destructive Docker operations
+
+Examples of destructive operations include:
+
+```
+docker compose down -v
+```
+
+```
+docker volume rm <volume-name>
+```
+
+The required frequency depends on how much data loss is acceptable
+
+Backup automation can be added later through `cron`, a systemd timer or a dedicated backup service
+
+### 13.11 Final Check
+
+The backup stage is complete when:
+
+- the analytical PostgreSQL dump was created
+- the PostgreSQL dump passed the readability check
+- the Superset metadata archive was created
+- the Superset archive passed the readability check
+- Superset started successfully after the backup
+- the Prefect dump was created when its metadata must be preserved
+- the runtime configuration archive was created
+- all backup files have restricted permissions
+- all checksums returned `OK`
+- at least one verified copy exists outside the VPS
+- S3 source data protection has been reviewed
+- destructive Docker operations are not performed without a current backup
+
+A complete test restoration in a separate environment is recommended but is not required to finish the initial deployment

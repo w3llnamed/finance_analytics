@@ -31,33 +31,74 @@ Then replace the example rows with the required local account values.
 
 ## Optional Demo Environment
 
-The project optionally includes an anonymized demo environment for public dashboard deployment.
+The project optionally includes an anonymized demo environment for public
+dashboard deployment.
 
-Reproducing the demo environment additionally requires the following seed files:
+The demo environment is controlled through:
+
+```
+DBT_ENABLE_DEMO
+```
+
+It is disabled by default:
+
+```
+DBT_ENABLE_DEMO=False
+```
+
+In this mode:
+
+- only dim_accounts.csv must be created locally
+- demo models are excluded from the dbt project
+- demo-specific tests are not executed
+- category_mapping_demo.csv is not required
+
+To enable the demo environment, set the following value in `infra/deploy/.env:`
+
+```
+DBT_ENABLE_DEMO=True
+```
+
+The enabled demo environment uses:
 
 `dbt/seeds/private/dim_accounts_demo.csv`
 `dbt/seeds/private/category_mapping_demo.csv`
 
+`dim_accounts.csv` contains the real account metadata and opening balances used
+by the canonical analytical models.
 
-`dim_accounts.csv` is a private seed containing the real account metadata and opening balances used by the canonical analytical models.
+`dim_accounts_demo.csv` contains anonymized account names. Demo accounts are
+linked to real accounts through account_id.
 
-`dim_accounts_demo.csv` is a public seed containing anonymized account names. Demo accounts are linked to real accounts through `account_id`.
+`category_mapping_demo.csv` contains mappings from real transaction categories
+to anonymized demo categories together with category-level amount masking
+parameters.
 
-`category_mapping_demo.csv` is a private seed containing mappings from real transaction categories to anonymized demo categories, together with category-level amount masking parameters.
-
-The demo models are built from the same canonical transaction pipeline as the main analytical mart. They first use the real account metadata from the private seed and then replace
-sensitive attributes using the demo seed files.
+The demo models are built from the same canonical transaction pipeline as the
+main analytical mart. They use the real account configuration internally and
+replace sensitive attributes before publishing the demo mart.
 
 `dim_accounts_demo.csv` is included in version control.
-`category_mapping_demo.csv` is excluded from version control because it contains mappings derived from real transaction categories. A public `.example` template is provided for creating the local file.
+
+`category_mapping_demo.csv` is excluded from version control because it
+contains mappings derived from real transaction categories. A public template
+is provided:
+
+`category_mapping_demo.csv.example`
 
 
 ## Build Requirements
 
-A standard private deployment requires only the local `dim_accounts.csv` file.
+A standard private deployment requires:
 
-The optional demo environment additionally requires the demo seed files described above.
+`dim_accounts.csv`
 
-The demo seeds are required only when reproducing the optional anonymized demo environment.
+An enabled demo environment additionally requires:
 
-The private `dim_accounts.csv` seed is required by the core analytical models and their associated data tests.
+`category_mapping_demo.csv`
+
+The demo category mapping is validated by singular data tests before the demo
+mart is considered valid.
+
+The private `dim_accounts.csv` seed remains required by the core analytical
+models and their associated data tests in both configurations.
