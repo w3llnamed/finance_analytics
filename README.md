@@ -349,7 +349,7 @@ the Prefect Worker Docker image during the image build.
 For development tools and direct execution outside Docker, the host system
 additionally requires:
 
-- Python 3.11+
+- Python 3.12
 - Python virtual environment support
 
 
