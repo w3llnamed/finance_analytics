@@ -3,14 +3,25 @@ finance_analytics:
 
   outputs:
     dev:
-      dbname: finance_analytics
+      type: postgres
       host: localhost
-      password: change_me
       port: 5432
+      user: dbt_runner
+      password: change_me
+      dbname: finance_analytics
       schema: stg
       threads: 4
+
+    ci:
       type: postgres
-      user: dbt_runner
+      host: localhost
+      port: 5432
+      user: ci_user
+      password: ci_password
+      dbname: finance_analytics_ci
+      schema: stg
+      threads: 4
+
     prod:
       type: postgres
       host: "{{ env_var('DBT_HOST') }}"

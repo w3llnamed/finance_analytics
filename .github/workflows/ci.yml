@@ -7,6 +7,21 @@ jobs:
   ci:
     runs-on: ubuntu-24.04
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci_user
+          POSTGRES_PASSWORD: ci_password # pragma: allowlist secret
+          POSTGRES_DB: finance_analytics_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci_user -d finance_analytics_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -21,3 +36,18 @@ jobs:
 
       - name: Run pre-commit
         run: pre-commit run --all-files
+
+      - name: Prepare dbt profile
+        run: |
+          mkdir -p ~/.dbt
+          cp dbt/profiles.yml.example ~/.dbt/profiles.yml
+
+      - name: Check dbt connection
+        working-directory: dbt
+        env:
+          DBT_HOST: localhost
+          DBT_PORT: "5432"
+          DBT_USER: ci_user
+          DBT_RUNNER_PASSWORD: ci_password # pragma: allowlist secret
+          DBT_DBNAME: finance_analytics_ci
+        run: dbt debug --target ci
