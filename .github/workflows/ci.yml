@@ -88,6 +88,10 @@ jobs:
           cp dbt/seeds/private/dim_accounts.csv.example \
             dbt/seeds/private/dim_accounts.csv
 
+      - name: Run SQLFluff
+        working-directory: dbt
+        run: sqlfluff lint . --config ../tests/ci/sqlfluff.cfg
+
       - name: Load synthetic raw data
         working-directory: infra/deploy
         run: |
