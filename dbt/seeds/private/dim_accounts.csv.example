@@ -2,4 +2,3 @@ account_id,account_name,opening_date,initial_amount,currency,is_active,is_reserv
 1,Arthas,2012-01-02,100,USD,TRUE,FALSE,FALSE
 2,Pandaren Brewmaster,2013-04-02,100,USD,TRUE,TRUE,FALSE
 3,Archimond,2015-01-02,100,USD,FALSE,FALSE,FALSE
-4,Thrall,2017-07-02,100,RUB,TRUE,FALSE,TRUE
