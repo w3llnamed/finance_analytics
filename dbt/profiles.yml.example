@@ -14,11 +14,11 @@ finance_analytics:
 
     ci:
       type: postgres
-      host: localhost
-      port: 5432
-      user: ci_user
-      password: ci_password
-      dbname: finance_analytics_ci
+      host: "{{ env_var('DBT_HOST') }}"
+      port: "{{ env_var('DBT_PORT') | int }}"
+      user: "{{ env_var('DBT_USER') }}"
+      password: "{{ env_var('DBT_RUNNER_PASSWORD') }}"
+      dbname: "{{ env_var('DBT_DBNAME') }}"
       schema: stg
       threads: 4
 

@@ -7,21 +7,6 @@ jobs:
   ci:
     runs-on: ubuntu-24.04
 
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: ci_user
-          POSTGRES_PASSWORD: ci_password # pragma: allowlist secret
-          POSTGRES_DB: finance_analytics_ci
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U ci_user -d finance_analytics_ci"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -37,17 +22,30 @@ jobs:
       - name: Run pre-commit
         run: pre-commit run --all-files
 
+      - name: Prepare CI environment
+        run: cp infra/deploy/.env.example infra/deploy/.env
+
+      - name: Start PostgreSQL
+        working-directory: infra/deploy
+        run: docker compose up -d --wait postgres
+
       - name: Prepare dbt profile
         run: |
           mkdir -p ~/.dbt
           cp dbt/profiles.yml.example ~/.dbt/profiles.yml
 
+      - name: Prepare dbt environment
+        run: |
+          set -u
+          source infra/deploy/.env
+
+          echo "DBT_HOST=$PG_HOST" >> "$GITHUB_ENV"
+          echo "DBT_PORT=$PG_PORT" >> "$GITHUB_ENV"
+          echo "DBT_USER=dbt_runner" >> "$GITHUB_ENV"
+          echo "DBT_DBNAME=$POSTGRES_DB" >> "$GITHUB_ENV"
+          echo "DBT_RUNNER_PASSWORD=$DBT_RUNNER_PASSWORD" >> "$GITHUB_ENV"
+          echo "DBT_ENABLE_DEMO=$DBT_ENABLE_DEMO" >> "$GITHUB_ENV"
+
       - name: Check dbt connection
         working-directory: dbt
-        env:
-          DBT_HOST: localhost
-          DBT_PORT: "5432"
-          DBT_USER: ci_user
-          DBT_RUNNER_PASSWORD: ci_password # pragma: allowlist secret
-          DBT_DBNAME: finance_analytics_ci
         run: dbt debug --target ci
