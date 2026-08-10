@@ -29,23 +29,34 @@ jobs:
         working-directory: infra/deploy
         run: docker compose config --quiet
 
-      - name: Check Dockerfiles
+      - name: Check Superset Dockerfile
         run: |
           docker buildx build --check \
             -f infra/deploy/superset.Dockerfile \
             infra/deploy
 
-          docker buildx build --check \
-            -f infra/deploy/prefect-worker.Dockerfile \
-            .
-
-      - name: Check Prefect flow import
-        run: |
-          python -c \
-            "from orchestration.flows.money_flow_s3_ingestion_flow import money_flow_s3_ingestion_flow"
-
       - name: Check Superset config syntax
         run: python -m py_compile infra/deploy/superset_config.py
+
+      - name: Start Prefect
+        working-directory: infra/deploy
+        run: |
+          docker compose up -d --build --wait \
+            prefect-worker \
+            prefect-services
+
+      - name: Check Prefect flow import
+        working-directory: infra/deploy
+        run: |
+          docker compose exec -T prefect-worker \
+            python -c \
+            "from orchestration.flows.money_flow_s3_ingestion_flow import money_flow_s3_ingestion_flow"
+
+      - name: Check Prefect work pool
+        working-directory: infra/deploy
+        run: |
+          docker compose exec -T prefect-worker \
+            prefect work-pool inspect finance-process-pool
 
       - name: Start PostgreSQL
         working-directory: infra/deploy
