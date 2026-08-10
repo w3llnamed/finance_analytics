@@ -55,8 +55,24 @@ jobs:
       - name: Check Prefect work pool
         working-directory: infra/deploy
         run: |
-          docker compose exec -T prefect-worker \
-            prefect work-pool inspect finance-process-pool
+          for i in {1..10}; do
+            status=$(
+              docker compose exec -T prefect-worker \
+                prefect work-pool inspect finance-process-pool --output json \
+              | python -c "import json, sys; print(json.load(sys.stdin)['status'])"
+            )
+
+            echo "Work pool status: $status"
+
+            if [ "$status" = "READY" ]; then
+              exit 0
+            fi
+
+            sleep 3
+          done
+
+          echo "Work pool did not become READY"
+          exit 1
 
       - name: Start PostgreSQL
         working-directory: infra/deploy
