@@ -1,5 +1,4 @@
-# Tested with the current apache/superset:latest image (Superset 6.0.1)
-FROM apache/superset:latest
+FROM apache/superset:6.1.0
 
 USER root
 
