@@ -1,5 +1,7 @@
 # Finance Analytics Platform
 
+[![CI](https://github.com/w3llnamed/finance_analytics/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/w3llnamed/finance_analytics/actions/workflows/ci.yml) ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+
 Personal finance analytics platform built with PostgreSQL, dbt, Python and Superset.
 
 The project implements a layered DWH architecture (`raw - stg - core - dm`), ingestion observability, dbt testing and BI dashboards for financial analysis and data quality monitoring.
