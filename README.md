@@ -18,6 +18,7 @@ The project implements a layered DWH architecture (`raw - stg - core - dm`), ing
   - [Deployment](#deployment)
   - [Architecture](#architecture)
   - [Tech Stack](#tech-stack)
+  - [Continuous Integration](#continuous-integration)
   - [External Storage and Ingestion](#external-storage-and-ingestion)
   - [Project Structure](#project-structure)
   - [Data Flow](#data-flow)
@@ -47,6 +48,7 @@ Current implementation includes:
 - dbt tests
 - Superset dashboards
 - Docker-based analytics environment
+- GitHub Actions continuous integration
 
 
 ## Features
@@ -183,7 +185,40 @@ Example templates are provided to document the required structure.
 - Docker and Docker Compose
 - S3-compatible object storage (Timeweb S3)
 - Caddy — production reverse proxy and automated HTTPS
+- GitHub Actions — continuous integration
+- SQLFluff — dbt-aware SQL linting
 
+
+## Continuous Integration
+
+The repository uses GitHub Actions to validate changes automatically on pushes
+and pull requests targeting the `main` branch.
+
+The CI pipeline performs:
+
+- pre-commit checks
+- Docker Compose configuration validation
+- Superset Dockerfile and Python configuration checks
+- Prefect Worker image build and dependency validation
+- Prefect flow import and work pool readiness checks
+- dbt connection validation against an isolated CI PostgreSQL instance
+- SQLFluff linting with the dbt templater
+- a complete `dbt build` using synthetic CI data
+
+The CI environment does not use production credentials or production financial
+data.
+
+Synthetic source data and CI-specific configuration are stored under:
+
+```
+tests/ci/
+```
+
+Workflow configuration and detailed CI documentation are stored under:
+
+```
+.github/workflows/
+```
 
 ## External Storage and Ingestion
 
@@ -205,6 +240,9 @@ S3 is not accessed directly by dbt. dbt works with PostgreSQL tables only.
 Main repository structure:
 
 ```
+├── .github/
+│   └── workflows/        # GitHub Actions CI workflow and documentation
+│
 ├── dbt/                  # dbt project: transformations, tests, seeds and macros
 │   ├── analyses/         # ad-hoc analytical SQL queries
 │   ├── macros/           # custom dbt macros
@@ -218,18 +256,21 @@ Main repository structure:
 │
 ├── infra/                # infrastructure SQL and deployment configuration
 │   ├── bootstrap/        # database roles, schemas, grants, raw and infra tables
-│   └── deploy/           # Docker Compose, Superset and Prefect deployment configuration
+│   └── deploy/           # Docker Compose, Superset and Prefect deployment configuration, Caddy configuration
 │
 ├── ingestion/            # Python ingestion layer for loading Money Flow CSV files
 │
 ├── orchestration/        # Prefect orchestration layer
 │   └── flows/            # Prefect flow definitions
 │
+├── tests/
+│   └── ci/               # synthetic data and CI-specific test configuration
+│
 ├── prefect.yaml          # Prefect deployment configuration
 ├── requirements.txt      # Python dependencies
 ├── README.md             # project overview
-├── CHANGELOG.md          # project changelog
-└── TODO.md               # project backlog
+│
+├── docs/
 ```
 
 

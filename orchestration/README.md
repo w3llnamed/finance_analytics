@@ -133,7 +133,7 @@ The Prefect Server port is bound to the VPS loopback interface, so the UI can be
 
 Run the following command on the local computer, not on the VPS:
 
-
+```
 ssh -N -L 4200:127.0.0.1:4200 <ssh-host>
 ```
 

@@ -28,7 +28,6 @@
 - [Failure and Retry Logic](#failure-and-retry-logic)
 - [Current Implementation Constraints](#current-implementation-constraints)
 - [Data State and Ownership](#data-state-and-ownership)
-- [Complete Sequence Diagram](#complete-sequence-diagram)
 - [Logic Location Map](#logic-location-map)
 - [Document Maintenance](#document-maintenance)
 

@@ -14,7 +14,7 @@
       - [Private dbt Seeds](#private-dbt-seeds)
       - [Domain Name](#domain-name)
     - [1.3 Security Principles](#13-security-principles)
-    - [1.3 Deployment Method](#13-deployment-method)
+    - [1.4 Deployment Method](#14-deployment-method)
   - [2. Deployment Architecture](#2-deployment-architecture)
   - [3. Server Preparation](#3-server-preparation)
     - [3.1 Check the Ubuntu Version](#31-check-the-ubuntu-version)
@@ -309,7 +309,7 @@ Commands and configuration examples use placeholders for passwords, IP addresses
 Real secrets must not be added to the documentation or committed to the repository.
 
 
-### 1.3 Deployment Method
+### 1.4 Deployment Method
 
 The deployment is performed incrementally.
 
