@@ -1273,6 +1273,40 @@ The update should be stopped if local files tracked by Git were changed directly
 
 Runtime secrets and private data must remain in files excluded through `.gitignore`
 
+Pulling repository changes updates the files on disk but does not automatically
+apply all changes to running services.
+
+If the update changes Docker images, Dockerfiles, dependencies or Compose
+configuration, rebuild and recreate the affected services from:
+
+```
+cd /opt/finance_analytics/infra/deploy
+```
+
+For a complete platform update, run:
+
+```
+docker compose up -d --build
+```
+
+Persistent data stored in Docker volumes is not removed by this command.
+
+If `prefect.yaml` was changed, update the Prefect deployment separately:
+
+```
+docker compose
+exec
+-w /opt/finance_analytics
+prefect-worker
+prefect deploy --all
+```
+
+After applying an update, verify the affected services using the checks
+described in Section 12.
+
+Before updates that may affect persistent data, create the relevant backups
+described in Section 13.
+
 
 ### 5.11 Final Check
 
@@ -3791,6 +3825,7 @@ docker volume rm <volume-name>
 The required frequency depends on how much data loss is acceptable
 
 Backup automation can be added later through `cron`, a systemd timer or a dedicated backup service
+
 
 ### 13.11 Final Check
 
