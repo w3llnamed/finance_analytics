@@ -7,9 +7,19 @@ Personal finance analytics platform built with PostgreSQL, dbt, Python and Apach
 The project implements a layered DWH architecture (`raw - stg - core - dm`), ingestion observability, dbt testing and BI dashboards for financial analysis and data quality monitoring.
 
 
+## Live Demo
+
+**Dashboard:** [Open Finance Analytics Dashboard](https://finance.konstantinmedvedev.com/superset/dashboard/finance_analytics_demo/?native_filters_key=Y3H3t07SxVg&standalone=1)
+
+**Demo credentials**
+- Username: `demo_user`
+- Password: `Thereisnospoon` <!-- pragma: allowlist secret -->
+
+
 ## Table of Contents
 
 - [Finance Analytics Platform](#finance-analytics-platform)
+  - [Live Demo](#live-demo)
   - [Table of Contents](#table-of-contents)
   - [Project Status](#project-status)
   - [Features](#features)
