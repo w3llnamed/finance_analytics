@@ -1,7 +1,6 @@
 # Continuous Integration
 
-This directory contains the GitHub Actions workflows used to validate the
-Finance Analytics Platform.
+This directory contains the GitHub Actions workflows used to validate the Finance Analytics Platform.
 
 The main CI workflow is:
 
@@ -12,8 +11,7 @@ The main CI workflow is:
 
 ## Purpose
 
-The CI pipeline validates repository changes in an isolated environment before
-they are accepted into the main branch.
+The CI pipeline validates repository changes in an isolated environment before they are accepted into the main branch.
 
 The workflow checks:
 
@@ -26,8 +24,7 @@ The workflow checks:
 - PostgreSQL and dbt connectivity
 - complete dbt model and test execution
 
-The CI environment uses synthetic data and does not require production
-credentials or production financial data.
+The CI environment uses synthetic data and does not require production credentials or production financial data.
 
 
 ## Triggers
@@ -70,8 +67,7 @@ infra/deploy/.env.example
 
 No production `.env` file or production credentials are used.
 
-Docker Compose configuration is validated before any project containers are
-started.
+Docker Compose configuration is validated before any project containers are started.
 
 
 ### Superset Checks
@@ -83,8 +79,7 @@ The CI pipeline performs:
 - Dockerfile validation with Docker Buildx
 - Python syntax validation for `superset_config.py`
 
-These checks verify the deployment configuration while keeping the CI pipeline
-lightweight.
+These checks verify the deployment configuration while keeping the CI pipeline lightweight.
 
 
 ### Prefect Smoke Test
@@ -108,8 +103,7 @@ The image build installs the repository Python dependencies and runs:
 pip check
 ```
 
-This verifies that the resulting Python environment does not contain broken
-package dependencies.
+This verifies that the resulting Python environment does not contain broken package dependencies.
 
 After startup, CI verifies that:
 
@@ -170,8 +164,7 @@ The configuration forces SQLFluff to compile the dbt project using the `ci` targ
 
 ### Synthetic Source Data
 
-Synthetic Money Flow data is loaded into the temporary PostgreSQL database
-from:
+Synthetic Money Flow data is loaded into the temporary PostgreSQL database from:
 
 ```
 tests/ci/raw_money_flow.sql
@@ -212,8 +205,7 @@ CI does not:
 - execute the real ingestion pipeline against S3
 - deploy changes to the VPS
 
-S3 integration and production deployment remain outside the scope of the
-standard CI workflow.
+S3 integration and production deployment remain outside the scope of the standard CI workflow.
 
 
 ## Execution Controls

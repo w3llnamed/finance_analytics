@@ -13,7 +13,8 @@ The ingestion process performs:
 - ingestion metadata registration
 - technical logging and status tracking
 
-The ingestion layer is intentionally lightweight and avoids business transformations. Business logic is implemented later in dbt models.
+The ingestion layer is intentionally lightweight and avoids business transformations.
+Business logic is implemented later in dbt models.
 
 
 ## Source System
@@ -56,7 +57,7 @@ The ingestion process stores values as close to the original source format as po
 Examples:
 
 - dates are initially loaded as text
-- numeric values are preserved from source CSV
+- numeric values are initially loaded as text without type conversion
 - business categorization is not modified
 - enrichment is deferred to dbt models
 
@@ -106,13 +107,10 @@ The script loads the latest available CSV file from S3 and registers ingestion m
 
 **The command must be executed after the Docker Compose environment has been started.**
 
+
 ## Metadata Tracking
 
-Each ingestion batch is registered in:
-
-```
-infra.ingestion_file_registry
-```
+Each ingestion batch is registered in: `infra.ingestion_file_registry`
 
 Tracked metadata includes:
 
@@ -140,7 +138,7 @@ Failures are registered in ingestion metadata tables for observability purposes.
 
 ## Orchestration
 
-The ingestion layer is normally executed by Prefect flows.
+The ingestion layer is normally executed by Prefect flow.
 
 Prefect is responsible for:
 
@@ -154,3 +152,5 @@ ingestion layer using `infra.ingestion_file_registry`.
 
 Direct execution of the ingestion script remains available for development and
 debugging.
+
+For more details, see `orchestration/README.md`

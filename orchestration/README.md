@@ -9,12 +9,11 @@ The orchestration layer coordinates ingestion and transformation processes while
 
 The orchestration layer is responsible for:
 
-- scheduled pipeline execution;
-- S3 polling;
-- duplicate file detection;
-- ingestion triggering;
-- dbt execution;
-- workflow monitoring and logging.
+- scheduled pipeline execution
+- S3 polling
+- ingestion triggering
+- dbt execution
+- workflow monitoring and logging
 
 The orchestration layer does not perform transformations itself. Its role is to coordinate execution of platform components.
 
@@ -23,24 +22,26 @@ The orchestration layer does not perform transformations itself. Its role is to 
 
 Current orchestration flow:
 
-```
-Timeweb S3
-      │
-      ▼
-Prefect Flow
-      │
-      ▼
-Check ingestion registry
-      │
-      ├── File already processed → Exit
-      │
-      └── New file
-              │
-              ▼
-      Python Ingestion
-              │
-              ▼
-          dbt build
+```mermaid
+flowchart TD
+
+    PREFECT["Prefect Flow"]
+    INGEST["Python Ingestion"]
+    S3["Timeweb S3"]
+    REGISTRY["Check ingestion registry"]
+    LOAD["Load data into raw layer"]
+    DBT["dbt build"]
+    EXIT["Exit"]
+
+    PREFECT --> INGEST
+    S3 --> INGEST
+
+    INGEST --> REGISTRY
+
+    REGISTRY -->|File already processed| EXIT
+    REGISTRY -->|New file| LOAD
+
+    LOAD --> DBT
 ```
 
 The orchestration flow relies on ingestion metadata stored in PostgreSQL.
@@ -66,14 +67,19 @@ prefect.yaml
 
 The current workflow performs the following steps:
 
-1. Connect to S3-compatible object storage.
-2. Determine the latest available Money Flow CSV file.
-3. Check `infra.ingestion_file_registry`.
-4. Verify whether the file has already been processed.
-5. Exit if the file already exists in the registry.
-6. Execute the ingestion pipeline.
-7. Execute dbt transformations and tests.
-8. Record execution logs in Prefect.
+1. Prefect starts the Python ingestion process.
+
+2. The ingestion layer connects to S3-compatible object storage and determines the latest available Money Flow CSV file.
+
+3. The ingestion layer checks `infra.ingestion_file_registry` to determine whether the file has already been successfully processed.
+
+4. If the file has already been processed, ingestion returns skipped and the Prefect flow exits without running dbt.
+
+5. If the file is new, the ingestion layer loads it into PostgreSQL and records ingestion metadata.
+
+6. After successful ingestion, Prefect executes dbt transformations and tests.
+
+7. Prefect records the workflow execution status and logs.
 
 
 ## Scheduling
@@ -100,21 +106,20 @@ prefect.yaml
 Create or update the deployment from inside the running Prefect Worker
 container:
 
-```bash
+```
 docker exec -it \
   -w /opt/finance_analytics \
   prefect-worker \
   prefect deploy
 ```
 
-The deployment configuration is read from the project-level `prefect.yaml`
-file.
+The deployment configuration is read from the project-level `prefect.yaml` file.
 
-The Prefect Worker is started automatically as part of the Docker Compose
-environment.
+The Prefect Worker is started automatically as part of the Docker Compose environment.
 
-It connects to Prefect Server, creates the `finance-process-pool` work pool if
-necessary and continuously polls it for scheduled flow runs.
+It connects to Prefect Server, creates the `finance-process-pool` work pool if necessary and continuously polls it for scheduled flow runs.
+
+For more details, see `infra/README.md`
 
 
 ## Accessing the Prefect UI on a VPS
@@ -127,7 +132,7 @@ Inside the Docker network, Prefect is available at:
 http://prefect-server:4200
 ```
 
-The hostname `prefect-server` is available only to containers connected to the Docker network and cannot be opened directly from the local computer
+The hostname `prefect-server` is available only to containers connected to the Docker network and cannot be opened directly from the local computer.
 
 The Prefect Server port is bound to the VPS loopback interface, so the UI can be accessed securely through an SSH tunnel
 
@@ -166,28 +171,6 @@ In this case, open:
 http://127.0.0.1:14200
 ```
 
-If the Prefect Server is configured to use a different port on the VPS, replace the second `4200` with the configured VPS port
-
-The general command format is:
-
-```
-ssh -N -L <local-port>:127.0.0.1:<vps-port> <ssh-host>
-```
-
-To open a specific deployment directly, use its deployment ID:
-
-```
-http://127.0.0.1:4200/deployments/deployment/<deployment-id>
-```
-
-Replace `4200` with the selected local port when a different local port is used
-
-The deployment ID is displayed after running:
-
-```
-docker compose exec prefect-worker prefect deploy --all
-```
-
 Press `Ctrl+C` in the local terminal to close the SSH tunnel
 
 Closing the tunnel only closes local access to the UI and does not stop Prefect Server, Prefect Worker or scheduled flow runs on the VPS
@@ -203,10 +186,10 @@ infra/deploy/prefect-worker.Dockerfile
 
 The image contains:
 
-- Python runtime;
-- ingestion dependencies;
-- dbt dependencies;
-- Prefect runtime.
+- Python runtime
+- ingestion dependencies
+- dbt dependencies
+- Prefect runtime
 
 
 ## Idempotency
@@ -228,19 +211,18 @@ Pipeline execution history is available through Prefect.
 
 Typical monitoring information includes:
 
-- flow status;
-- execution duration;
-- failure logs;
-- retry history;
-- deployment schedule status.
+- flow status
+- execution duration
+- failure logs
+- retry history
+- deployment schedule status
 
 
 ## Future Improvements
 
 Potential future enhancements:
 
-- Telegram notifications;
-- anomaly-based alerting;
-- multiple ingestion pipelines;
-- event-driven execution;
-- data quality gates.
+- Telegram notifications for pipeline failures and data quality issues
+- anomaly-based alerting
+- support for multiple ingestion pipelines
+- event-driven pipeline execution
