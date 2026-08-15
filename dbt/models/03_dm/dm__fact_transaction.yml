@@ -59,14 +59,14 @@ models:
 
       - name: expense_type
         description: >
-          Expense classification based on regular and reserve expense tags.
+          Expense classification based on recurring and reserve-funded expense tags.
         tests:
           - accepted_values:
               arguments:
                 values:
-                  - 'Regular'
-                  - 'Reserve'
-                  - 'Discretionary'
+                  - 'Recurring'
+                  - 'Reserve-funded'
+                  - 'Ad hoc'
 
       - name: account_type
         description: >

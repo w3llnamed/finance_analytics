@@ -36,16 +36,16 @@ The project uses dbt seeds for small static reference datasets and user-specific
 
 Public seeds included in the repository:
 
-- `regular_expense_tag.csv` - tags used to identify regular expenses
-- `reserve_expense_tag.csv` - tags used to identify reserve-related expenses
+- `recurring_expense_tag.csv` - tags used to identify recurring expenses
+- `reserve_funded_expense_tag.csv` - tags used to identify reserve-funded expenses
 - `dim_accounts_demo.csv` - anonymized account names used by the optional demo mart
 
-The `regular_expense_tag.csv` and `reserve_expense_tag.csv` seeds define the source transaction tags used to classify expenses as regular or reserve-related.
+The `recurring_expense_tag.csv` and `reserve_funded_expense_tag.csv` seeds define the source transaction tags used to classify expenses as recurring or reserve-funded.
 
 Transactions are assigned to the corresponding analytical groups only when their Money Flow tags match a value from the relevant seed.
 
 If these tags are not assigned to transactions in the source application, the corresponding dashboard filters cannot identify those transactions as
-regular or reserve-related expenses.
+recurring or reserve-funded expenses.
 
 The following private seed is required for a standard project deployment:
 

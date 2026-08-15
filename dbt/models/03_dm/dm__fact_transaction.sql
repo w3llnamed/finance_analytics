@@ -1,23 +1,23 @@
 /* =============================================================================
-   dm__fact__transaction.sql
-   Layer: dm
-   Purpose: Analytical mart with transaction-level flags for regular and reserve expenses.
+    dm__fact__transaction.sql
+    Layer: dm
+    Purpose: Analytical mart with expense and account classifications.
 
-   Source:
-       core.fact_transaction
-       seed.regular_expense_tag
-       seed.reserve_expense_tag
+    Source:
+        core.fact_transaction
+        seed.recurring_expense_tag
+        seed.reserve_funded_expense_tag
 
-   Description:
-       The model enriches fact transactions with analytical flags based on tags:
-       - is_regular  — transaction has at least one active regular expense tag
-       - is_reserve  — transaction has at least one active reserve expense tag
+    Description:
+        The model enriches fact transactions with expense and account classifications:
+        - expense_type is derived from active recurring and reserve-funded expense tags
+        - account_type is derived from reserve and credit account flags
 
-       Each transaction is expanded into five time grains:
-       Day, Week, Month, Quarter and Year.
+        Each transaction is expanded into five time grains:
+        Day, Week, Month, Quarter and Year.
 
-       This allows dashboards to use categorical period axes while preserving
-       dynamic grain selection and dashboard cross-filtering by period.
+        This allows dashboards to use categorical period axes while preserving
+        dynamic grain selection and dashboard cross-filtering by period.
    ============================================================================= */
 
 WITH source AS (
@@ -43,14 +43,14 @@ flagged AS (
 
     SELECT
         src.*,
-        rt.tag IS NOT NULL AS is_regular_expense,
-        rs.tag IS NOT NULL AS is_reserve_expense
+        rt.tag IS NOT NULL AS is_recurring_expense,
+        rs.tag IS NOT NULL AS is_reserve_funded_expense
     FROM source AS src
-    LEFT JOIN {{ ref('regular_expense_tag') }} AS rt
+    LEFT JOIN {{ ref('recurring_expense_tag') }} AS rt
         ON
             rt.tag = ANY(STRING_TO_ARRAY(src.tags, ', '))
             AND rt.is_active = TRUE
-    LEFT JOIN {{ ref('reserve_expense_tag') }} AS rs
+    LEFT JOIN {{ ref('reserve_funded_expense_tag') }} AS rs
         ON
             rs.tag = ANY(STRING_TO_ARRAY(src.tags, ', '))
             AND rs.is_active = TRUE
@@ -79,9 +79,9 @@ final AS (
         END AS transaction_type,
 
         CASE
-            WHEN is_regular_expense THEN 'Regular'
-            WHEN is_reserve_expense THEN 'Reserve'
-            ELSE 'Discretionary'
+            WHEN is_recurring_expense THEN 'Recurring'
+            WHEN is_reserve_funded_expense THEN 'Reserve-funded'
+            ELSE 'Ad hoc'
         END AS expense_type,
 
         CASE

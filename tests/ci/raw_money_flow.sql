@@ -81,7 +81,7 @@ VALUES
         NULL,
         'Регулярные траты',
         'CI Location',
-        'CI regular expense',
+        'CI recurring expense',
         'ci/money_flow.csv',
         1
     ),
@@ -100,7 +100,7 @@ VALUES
         NULL,
         'Расход резерва',
         NULL,
-        'CI reserve expense',
+        'CI reserve-funded expense',
         'ci/money_flow.csv',
         1
     ),

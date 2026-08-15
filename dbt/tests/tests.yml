@@ -9,16 +9,18 @@ data_tests:
       Prevents unclassified or unmanaged accounts
       from appearing in downstream analytics.
 
-  - name: assert_regular_expense_tag_has_at_most_one_active_row
+  - name: assert_recurring_expense_tag_has_at_most_one_active_row
     description: >
-      Проверяет, что seed regular_expense_tag содержит
-      не более одной активной записи.
-      Это предотвращает дублирование транзакций
-      при JOIN в dm__fact_transaction.
+      Validates that the recurring_expense_tag seed contains
+      at most one active record.
 
-  - name: assert_reserve_expense_tag_has_at_most_one_active_row
+      Prevents transaction duplication when joining the seed
+      to dm__fact_transaction.
+
+  - name: assert_reserve_funded_expense_tag_has_at_most_one_active_row
     description: >
-      Проверяет, что seed reserve_expense_tag содержит
-      не более одной активной записи.
-      Это предотвращает дублирование транзакций
-      при JOIN в dm__fact_transaction.
+      Validates that the reserve_funded_expense_tag seed contains
+      at most one active record.
+
+      Prevents transaction duplication when joining the seed
+      to dm__fact_transaction.

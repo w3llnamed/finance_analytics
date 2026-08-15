@@ -827,32 +827,29 @@ are included.
 Transactions and opening balances for inactive or unmapped accounts are excluded from the analytical mart.
 
 
-### Regular and reserve expense tags
+### Recurring and reserve-funded expense tags
 
 The mart joins two seed dictionaries:
 
-- `regular_expense_tag`
-- `reserve_expense_tag`
+- `recurring_expense_tag`
+- `reserve_funded_expense_tag`
 
-The source tags string is split with the exact delimiter `,`
+The source tags string is split using the exact delimiter `, `.
 
-Only active seed rows participate in the join.
+Only active seed rows participate in the joins.
 
-The model creates:
-
-- `is_regular_expense`
-- `is_reserve_expense`
+Matching tags are used internally to derive the `expense_type` classification.
 
 
 ### Expense type
 
 The public analytical value `expense_type` is derived with the following priority:
 
-- A regular tag produces `Regular`
-- Otherwise a reserve tag produces `Reserve`
-- Otherwise the row produces `Discretionary`
+- A recurring tag produces `Recurring`
+- Otherwise a reserve-funded tag produces `Reserve-funded`
+- Otherwise the row produces `Ad hoc`
 
-When a transaction contains both an active regular tag and an active reserve tag, `Regular` has priority.
+When a transaction contains both an active recurring tag and an active reserve-funded tag, `Recurring` has priority.
 
 The field is calculated for every row, including income, transfers and opening balances.
 Downstream charts should combine it with `transaction_type` when expense-only analysis is required.
@@ -1014,7 +1011,7 @@ This prevents unmanaged accounts from being silently accepted by downstream anal
 
 ### Expense tag dictionary tests
 
-The `regular_expense_tag` and `reserve_expense_tag` seeds are checked for:
+The `recurring_expense_tag` and `reserve_funded_expense_tag` seeds are checked for:
 
 - Non-null and unique tag values
 - No more than one active row
@@ -1404,8 +1401,8 @@ This differs from the usual semantic expectation of an absolute-value field and 
 ### Reference state
 
 - `dim_accounts` defines account metadata and opening balances
-- `regular_expense_tag` defines the active regular expense tag
-- `reserve_expense_tag` defines the active reserve expense tag
+- `recurring_expense_tag` defines the active recurring expense tag
+- `reserve_funded_expense_tag` defines the active reserve-funded expense tag
 - `dim_accounts_demo` defines public demo account labels and balances
 - `category_mapping_demo` defines private real-to-demo category mapping and masking factors
 
@@ -1538,7 +1535,7 @@ dbt/models/03_dm/dm__fact_transaction.sql
 Contains:
 
 - Active account filtering
-- Regular and reserve classification
+- Recurring and reserve-funded classification
 - Display transaction types
 - Account types
 

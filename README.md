@@ -240,7 +240,7 @@ from the dataset instead of being represented as explicit zero values.
 
 This behavior is primarily visible at daily granularity. At higher levels, transactions are grouped into weeks, months or years.
 
-Regular and reserve-related expense filters rely on transaction tags configured in the `regular_expense_tag.csv` and `reserve_expense_tag.csv` dbt seeds.
+Recurring and reserve-funded expense filters rely on transaction tags configured in the `recurring_expense_tag.csv` and `reserve_funded_expense_tag.csv` dbt seeds.
 
 Transactions without the corresponding source tags cannot be selected through these expense-type filters.
 

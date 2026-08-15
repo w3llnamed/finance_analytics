@@ -2,7 +2,7 @@
 version: 2
 
 seeds:
-  - name: regular_expense_tag
+  - name: recurring_expense_tag
     description: >
       Defines the tag that marks recurring expenses.
       Exactly one active record must exist.
@@ -30,9 +30,9 @@ seeds:
         data_tests:
           - not_null
 
-  - name: reserve_expense_tag
+  - name: reserve_funded_expense_tag
     description: >
-      Defines the tag that marks reserve expenses.
+      Defines the tag that marks reserve-funded expenses.
       Exactly one active record must exist.
       This constraint is validated by a singular dbt test.
     config:

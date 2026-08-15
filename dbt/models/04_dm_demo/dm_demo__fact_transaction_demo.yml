@@ -58,11 +58,11 @@ models:
 
       - name: expense_type
         description: >
-          Type of expense based on regular and reserve tags.
+          Type of expense based on recurring and reserve-funded tags.
         tests:
           - accepted_values:
               arguments:
-                values: ['Regular', 'Reserve', 'Discretionary']
+                values: ['Recurring', 'Reserve-funded', 'Ad hoc']
 
       - name: account_type
         description: >
