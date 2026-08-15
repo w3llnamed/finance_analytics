@@ -15,6 +15,13 @@
        The model mirrors dm.fact_transaction but replaces real accounts and
        categories with demo values and masks transaction amounts using
        category-level masking parameters.
+
+       Each transaction is expanded into five time grains:
+       Day, Week, Month, Quarter and Year.
+
+       This allows demo dashboards to use categorical period axes while
+       preserving dynamic grain selection and dashboard cross-filtering
+       by period.
    ============================================================================= */
 
 WITH source AS (
@@ -111,7 +118,73 @@ final AS (
         END AS account_type
     FROM mapped
 
+),
+
+periodized AS (
+
+    SELECT
+        final.*,
+        period.period_grain,
+        period.period
+    FROM final
+
+    CROSS JOIN LATERAL (
+
+        VALUES
+
+            (
+                'Day'::text,
+                TO_CHAR(
+                    final.transaction_date,
+                    'YYYY-MM-DD'
+                )
+            ),
+
+            (
+                'Week'::text,
+                TO_CHAR(
+                    DATE_TRUNC(
+                        'week',
+                        final.transaction_date
+                    ),
+                    'YYYY-MM-DD'
+                )
+            ),
+
+            (
+                'Month'::text,
+                TO_CHAR(
+                    final.transaction_date,
+                    'YYYY-MM'
+                )
+            ),
+
+            (
+                'Quarter'::text,
+                TO_CHAR(
+                    final.transaction_date,
+                    'YYYY'
+                )
+                || '-Q'
+                || EXTRACT(
+                    QUARTER FROM final.transaction_date
+                )::integer::text
+            ),
+
+            (
+                'Year'::text,
+                TO_CHAR(
+                    final.transaction_date,
+                    'YYYY'
+                )
+            )
+
+    ) AS period (
+        period_grain,
+        period
+    )
+
 )
 
 SELECT *
-FROM final
+FROM periodized

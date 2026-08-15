@@ -6,12 +6,15 @@ models:
       Anonymized analytical mart for public demo dashboards.
       The model mirrors dm__fact_transaction but replaces real accounts
       and categories with demo values and masks transaction amounts using
-      category-level masking parameters from the private category_mapping_demo seed.
+      category-level masking parameters from the category_mapping_demo seed.
+      Each transaction is expanded into five time grains (Day, Week, Month,
+      Quarter, and Year) to support dynamic period selection and dashboard
+      cross-filtering.
 
     columns:
       - name: transaction_date
         description: >
-          Transaction date and time.
+          Original transaction date and time.
         tests:
           - not_null
 
@@ -68,3 +71,20 @@ models:
           - accepted_values:
               arguments:
                 values: ['Regular', 'Reserve', 'Credit']
+
+      - name: period_grain
+        description: >
+          Time grain used for the categorical period representation.
+          Each source transaction is represented once for every supported grain.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Day', 'Week', 'Month', 'Quarter', 'Year']
+
+      - name: period
+        description: >
+          ISO-like categorical period label corresponding to period_grain,
+          such as 2026-08-14, 2026-08-10, 2026-08, 2026-Q3, or 2026.
+        tests:
+          - not_null
