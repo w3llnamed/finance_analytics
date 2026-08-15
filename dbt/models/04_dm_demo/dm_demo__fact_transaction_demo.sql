@@ -114,7 +114,7 @@ final AS (
         CASE
             WHEN is_reserve_account THEN 'Reserve'
             WHEN is_credit_account THEN 'Credit'
-            ELSE 'Regular'
+            ELSE 'Standard'
         END AS account_type
     FROM mapped
 

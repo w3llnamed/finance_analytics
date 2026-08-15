@@ -861,7 +861,7 @@ The analytical account type is derived with the following priority:
 
 - Reserve account produces `Reserve`
 - Otherwise credit account produces `Credit`
-- Otherwise the account produces `Regular`
+- Otherwise the account produces `Standard`
 
 When both reserve and credit flags are true, `Reserve` has priority.
 
