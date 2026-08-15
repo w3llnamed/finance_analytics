@@ -132,52 +132,52 @@ periodized AS (
 
         VALUES
 
-            (
-                'Day'::text,
-                TO_CHAR(
-                    final.transaction_date,
-                    'YYYY-MM-DD'
-                )
-            ),
-
-            (
-                'Week'::text,
-                TO_CHAR(
-                    DATE_TRUNC(
-                        'week',
-                        final.transaction_date
-                    ),
-                    'YYYY-MM-DD'
-                )
-            ),
-
-            (
-                'Month'::text,
-                TO_CHAR(
-                    final.transaction_date,
-                    'YYYY-MM'
-                )
-            ),
-
-            (
-                'Quarter'::text,
-                TO_CHAR(
-                    final.transaction_date,
-                    'YYYY'
-                )
-                || '-Q'
-                || EXTRACT(
-                    QUARTER FROM final.transaction_date
-                )::integer::text
-            ),
-
-            (
-                'Year'::text,
-                TO_CHAR(
-                    final.transaction_date,
-                    'YYYY'
-                )
+        (
+            'Day'::text,
+            TO_CHAR(
+                final.transaction_date,
+                'YYYY-MM-DD'
             )
+        ),
+
+        (
+            'Week'::text,
+            TO_CHAR(
+                DATE_TRUNC(
+                    'week',
+                    final.transaction_date
+                ),
+                'YYYY-MM-DD'
+            )
+        ),
+
+        (
+            'Month'::text,
+            TO_CHAR(
+                final.transaction_date,
+                'YYYY-MM'
+            )
+        ),
+
+        (
+            'Quarter'::text,
+            TO_CHAR(
+                final.transaction_date,
+                'YYYY'
+            )
+            || '-Q'
+            || EXTRACT(
+                QUARTER FROM final.transaction_date
+            )::integer::text
+        ),
+
+        (
+            'Year'::text,
+            TO_CHAR(
+                final.transaction_date,
+                'YYYY'
+            )
+        )
 
     ) AS period (
         period_grain,

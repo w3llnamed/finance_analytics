@@ -9,4 +9,4 @@ FROM {{ ref('category_mapping_demo') }}
 GROUP BY
     real_parent_category,
     real_category
-HAVING count(*) > 1
+HAVING COUNT(*) > 1
