@@ -1,13 +1,13 @@
 {# -----------------------------------------------------------------------------
    generate_schema_name
-   Назначение:
-     Отключает дефолтную логику dbt по склейке схем
+   Purpose:
+     Disables dbt's default schema concatenation logic
      (target.schema + '_' + custom_schema_name).
 
-     Если для модели задан +schema — используется ровно это значение.
-     Иначе используется target.schema как fallback.
+     If +schema is defined for a model, that exact value is used.
+     Otherwise, target.schema is used as a fallback.
 
-   Используется для реализации чистой DWH-архитектуры:
+   Used to implement a clean DWH architecture:
      raw / stg / core / dm
 ----------------------------------------------------------------------------- #}
 {% macro generate_schema_name(custom_schema_name, node) -%}

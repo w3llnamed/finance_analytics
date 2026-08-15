@@ -3,18 +3,20 @@ version: 2
 macros:
   - name: generate_schema_name
     description: >
-      Макрос переопределяет стандартную логику dbt формирования имени схемы.
-      Если у модели задан +schema, используется оно без модификаций.
-      В противном случае используется target.schema.
-      Применяется для строгой DWH-архитектуры: raw / stg / core / dm.
+      Overrides dbt's default schema naming logic.
+      If +schema is defined for a model, that value is used without modification.
+      Otherwise, target.schema is used.
+      This macro is used to enforce a clean DWH architecture:
+      raw / stg / core / dm.
     arguments:
       - name: custom_schema_name
         type: string
         description: >
-          Значение схемы, заданное у модели через +schema
-          (может быть `none`).
+          Schema value defined for the model via +schema
+          (may be `none`).
 
       - name: node
         type: node
         description: >
-          Объект модели dbt. Передаётся автоматически, напрямую не используется.
+          dbt model node object.
+          Passed automatically and not used directly.
