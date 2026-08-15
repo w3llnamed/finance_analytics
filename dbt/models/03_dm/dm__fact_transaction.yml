@@ -3,13 +3,16 @@ version: 2
 models:
   - name: dm__fact_transaction
     description: >
-      Analytical mart with transaction-level flags for regular and reserve expenses
-      based on active tags from seed dictionaries.
+      Analytical transaction-level mart enriched with expense and account
+      classifications based on active tags and account attributes.
+      Each transaction is expanded into five time grains (Day, Week, Month,
+      Quarter, and Year) to support dynamic period selection and dashboard
+      cross-filtering.
 
     columns:
       - name: transaction_date
         description: >
-          Transaction date and time.
+          Original transaction date and time.
         tests:
           - not_null
 
@@ -19,7 +22,7 @@ models:
 
       - name: amount
         description: >
-          Transaction amount divided by.
+          Transaction amount.
 
       - name: amount_abs
         description: >
@@ -44,11 +47,56 @@ models:
       - name: transaction_type
         description: >
           Transaction type.
-
-      - name: expense_type
-        description: >
-          Type of expense based in flags `is_reserve` and `is_regular`.
         tests:
           - accepted_values:
               arguments:
-                values: ['Regular', 'Reserve', 'Discretionary']
+                values:
+                  - 'Transfer out'
+                  - 'Transfer in'
+                  - 'Expense'
+                  - 'Income'
+                  - 'Opening balance'
+
+      - name: expense_type
+        description: >
+          Expense classification based on regular and reserve expense tags.
+        tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - 'Regular'
+                  - 'Reserve'
+                  - 'Discretionary'
+
+      - name: account_type
+        description: >
+          Account classification based on reserve and credit account flags.
+        tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - 'Regular'
+                  - 'Reserve'
+                  - 'Credit'
+
+      - name: period_grain
+        description: >
+          Time grain used for the categorical period representation.
+          Each source transaction is represented once for every supported grain.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - 'Day'
+                  - 'Week'
+                  - 'Month'
+                  - 'Quarter'
+                  - 'Year'
+
+      - name: period
+        description: >
+          ISO-like categorical period label corresponding to period_grain,
+          such as 2026-08-14, 2026-08-10, 2026-08, 2026-Q3, or 2026.
+        tests:
+          - not_null

@@ -12,6 +12,12 @@
        The model enriches fact transactions with analytical flags based on tags:
        - is_regular  — transaction has at least one active regular expense tag
        - is_reserve  — transaction has at least one active reserve expense tag
+
+       Each transaction is expanded into five time grains:
+       Day, Week, Month, Quarter and Year.
+
+       This allows dashboards to use categorical period axes while preserving
+       dynamic grain selection and dashboard cross-filtering by period.
    ============================================================================= */
 
 WITH source AS (
@@ -49,6 +55,7 @@ flagged AS (
             rs.tag = ANY(STRING_TO_ARRAY(src.tags, ', '))
             AND rs.is_active = TRUE
     WHERE src.is_active_account IS TRUE
+
 ),
 
 final AS (
@@ -62,6 +69,7 @@ final AS (
         category,
         tags,
         note,
+
         CASE
             WHEN transaction_type = 'transfer_out' THEN 'Transfer out'
             WHEN transaction_type = 'transfer_in' THEN 'Transfer in'
@@ -69,11 +77,13 @@ final AS (
             WHEN transaction_type = 'income' THEN 'Income'
             WHEN transaction_type = 'opening_balance' THEN 'Opening balance'
         END AS transaction_type,
+
         CASE
             WHEN is_regular_expense THEN 'Regular'
             WHEN is_reserve_expense THEN 'Reserve'
             ELSE 'Discretionary'
         END AS expense_type,
+
         CASE
             WHEN is_reserve_account THEN 'Reserve'
             WHEN is_credit_account THEN 'Credit'
@@ -81,7 +91,73 @@ final AS (
         END AS account_type
     FROM flagged
 
+),
+
+periodized AS (
+
+    SELECT
+        final.*,
+        period.period_grain,
+        period.period
+    FROM final
+
+    CROSS JOIN LATERAL (
+
+        VALUES
+
+            (
+                'Day'::text,
+                TO_CHAR(
+                    final.transaction_date,
+                    'YYYY-MM-DD'
+                )
+            ),
+
+            (
+                'Week'::text,
+                TO_CHAR(
+                    DATE_TRUNC(
+                        'week',
+                        final.transaction_date
+                    ),
+                    'YYYY-MM-DD'
+                )
+            ),
+
+            (
+                'Month'::text,
+                TO_CHAR(
+                    final.transaction_date,
+                    'YYYY-MM'
+                )
+            ),
+
+            (
+                'Quarter'::text,
+                TO_CHAR(
+                    final.transaction_date,
+                    'YYYY'
+                )
+                || '-Q'
+                || EXTRACT(
+                    QUARTER FROM final.transaction_date
+                )::integer::text
+            ),
+
+            (
+                'Year'::text,
+                TO_CHAR(
+                    final.transaction_date,
+                    'YYYY'
+                )
+            )
+
+    ) AS period (
+        period_grain,
+        period
+    )
+
 )
 
 SELECT *
-FROM final
+FROM periodized
