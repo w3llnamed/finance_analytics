@@ -47,6 +47,7 @@ Thumbs.db
 # =========================
 # Local databases / backups
 # =========================
+backups/
 *.db
 *.sqlite
 *.sqlite3

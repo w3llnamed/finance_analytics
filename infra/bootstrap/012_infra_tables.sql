@@ -1,15 +1,13 @@
 /* =============================================================================
-   infra.ingestion_file_registry.sql
+   012_infra_tables.sql
    Layer: infra
-   Purpose: Registry of files discovered in external storage (e.g. S3) and
-            processed by the ingestion pipeline.
+   Purpose: Create infrastructure and ingestion metadata tables.
    ============================================================================= */
 
 
 /* =======================================================
    ingestion_file_registry
    ======================================================= */
-
 CREATE TABLE IF NOT EXISTS infra.ingestion_file_registry
 (
     ingestion_id      BIGSERIAL PRIMARY KEY,
@@ -39,3 +37,22 @@ CREATE TABLE IF NOT EXISTS infra.ingestion_file_registry
 
 CREATE UNIQUE INDEX IF NOT EXISTS ux_ingestion_file_registry_s3_object
 ON infra.ingestion_file_registry (s3_bucket, s3_key);
+
+
+/* =======================================================
+   fx_ingestion_state
+   ======================================================= */
+CREATE TABLE IF NOT EXISTS infra.fx_ingestion_state
+(
+    source                  TEXT        NOT NULL,
+    currency_code           TEXT        NOT NULL,
+
+    last_checked_at         TIMESTAMPTZ,
+    last_requested_through  DATE,
+    last_rate_date          DATE,
+    last_rows_affected      INTEGER,
+
+    updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    PRIMARY KEY (source, currency_code)
+);
