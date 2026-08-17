@@ -6,6 +6,7 @@ Finance Analytics Platform is an end-to-end personal finance analytics project b
 
 It implements a layered DWH architecture (`raw → stg → core → dm`) using PostgreSQL, dbt, Python and Apache Superset, with ingestion observability, automated data quality testing and BI dashboards for financial analysis.
 
+**For full end-to-end data flow description please see `docs/architecture/end_to_end_data_flow.md`.**
 
 ## Live Demo
 
