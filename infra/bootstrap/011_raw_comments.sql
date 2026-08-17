@@ -72,3 +72,41 @@ COMMENT ON COLUMN raw.money_flow.source_file IS
 
 COMMENT ON COLUMN raw.money_flow.ingestion_id IS
 'Reference to infra.ingestion_file_registry.ingestion_id for tracing ingestion batches.';
+
+
+/* =======================================================
+   exchange_rate
+   =======================================================*/
+COMMENT ON TABLE raw.exchange_rate IS
+'Raw landing table for exchange rates fetched from official FX sources (e.g. CBR). Stores source data as-is without cleaning or type conversion. One row per (source, rate_date, base_currency, quote_currency), upserted on refresh.';
+
+
+COMMENT ON COLUMN raw.exchange_rate.raw_id IS
+'Technical surrogate key for raw records.';
+
+COMMENT ON COLUMN raw.exchange_rate.source IS
+'Exchange-rate source identifier (as-is, TEXT, e.g. cbr).';
+
+COMMENT ON COLUMN raw.exchange_rate.source_rate_key IS
+'Source-specific identifier for the rate series (as-is, TEXT, e.g. CBR currency ID).';
+
+COMMENT ON COLUMN raw.exchange_rate.rate_date IS
+'Original rate date from the source (as-is, TEXT, not parsed; format depends on source).';
+
+COMMENT ON COLUMN raw.exchange_rate.base_currency IS
+'Currency code the rate is quoted from, as provided by the source (as-is, TEXT).';
+
+COMMENT ON COLUMN raw.exchange_rate.base_amount IS
+'Original base amount/nominal from the source (as-is, TEXT, not converted to numeric).';
+
+COMMENT ON COLUMN raw.exchange_rate.quote_currency IS
+'Currency code the rate is quoted to, as provided by the source (as-is, TEXT).';
+
+COMMENT ON COLUMN raw.exchange_rate.quote_amount IS
+'Original quote amount/value from the source (as-is, TEXT, not converted to numeric).';
+
+COMMENT ON COLUMN raw.exchange_rate.ingested_at IS
+'UTC timestamp when the row was last ingested or updated in the raw layer.';
+
+COMMENT ON COLUMN raw.exchange_rate.ingested_by IS
+'Technical field storing the ingestion user or service account.';

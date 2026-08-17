@@ -26,22 +26,32 @@ Current orchestration flow:
 flowchart TD
 
     PREFECT["Prefect Flow"]
-    INGEST["Python Ingestion"]
+    INGEST["Python Money Flow Ingestion"]
+    FX_INGEST["Python FX Ingestion"]
     S3["Timeweb S3"]
     REGISTRY["Check ingestion registry"]
+    FX_STATE["Check infra.fx_ingestion_state"]
     LOAD["Load data into raw layer"]
+    FX_LOAD["Load exchange rates into raw layer"]
     DBT["dbt build"]
     EXIT["Exit"]
 
-    PREFECT --> INGEST
     S3 --> INGEST
+    PREFECT --> INGEST
+    PREFECT --> FX_INGEST
 
     INGEST --> REGISTRY
 
     REGISTRY -->|File already processed| EXIT
     REGISTRY -->|New file| LOAD
 
+    FX_INGEST --> FX_STATE
+
+    FX_STATE -->|Refresh not due| EXIT
+    FX_STATE -->|Refresh due| FX_LOAD
+
     LOAD --> DBT
+    FX_LOAD --> DBT
 ```
 
 The orchestration flow relies on ingestion metadata stored in PostgreSQL.
@@ -67,19 +77,17 @@ prefect.yaml
 
 The current workflow performs the following steps:
 
-1. Prefect starts the Python ingestion process.
+1. Prefect starts the Money Flow ingestion process.
 
 2. The ingestion layer connects to S3-compatible object storage and determines the latest available Money Flow CSV file.
 
-3. The ingestion layer checks `infra.ingestion_file_registry` to determine whether the file has already been successfully processed.
+3. The ingestion layer checks `infra.ingestion_file_registry` to determine whether the file has already been successfully processed. If the file is new, it loads it into PostgreSQL and records ingestion metadata; otherwise Money Flow ingestion returns skipped.
 
-4. If the file has already been processed, ingestion returns skipped and the Prefect flow exits without running dbt.
+4. Prefect then starts the exchange-rate ingestion process, which checks `infra.fx_ingestion_state` and refreshes rates from the CBR API when a refresh is due.
 
-5. If the file is new, the ingestion layer loads it into PostgreSQL and records ingestion metadata.
+5. If either ingestion task returned loaded, Prefect executes dbt transformations and tests. If both returned skipped, the flow exits without running dbt.
 
-6. After successful ingestion, Prefect executes dbt transformations and tests.
-
-7. Prefect records the workflow execution status and logs.
+6. Prefect records the workflow execution status and logs.
 
 
 ## Scheduling
@@ -196,13 +204,17 @@ The image contains:
 
 The orchestration layer is designed to prevent duplicate processing.
 
-Before executing ingestion, the flow verifies whether the source file has already been registered in:
+For Money Flow, the flow verifies whether the source file has already been registered in:
 
 ```
 infra.ingestion_file_registry
 ```
 
-If the file is already registered, the flow exits without loading data or executing dbt.
+If the file is already registered, Money Flow ingestion returns skipped without loading data.
+
+For exchange rates, idempotency instead relies on a refresh-timing check against `infra.fx_ingestion_state` and an upsert that only updates a row when its value actually changed, rather than on a per-file registry.
+
+`dbt build` still runs if either ingestion task returned loaded; the flow exits without running dbt only when both returned skipped.
 
 
 ## Monitoring

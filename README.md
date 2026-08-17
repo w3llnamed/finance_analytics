@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/w3llnamed/finance_analytics/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/w3llnamed/finance_analytics/actions/workflows/ci.yml) ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 
-Personal finance analytics platform built with PostgreSQL, dbt, Python and Apache Superset.
+Finance Analytics Platform is an end-to-end personal finance analytics project built to demonstrate production-style data engineering practices.
 
-The project implements a layered DWH architecture (`raw - stg - core - dm`), ingestion observability, dbt testing and BI dashboards for financial analysis and data quality monitoring.
+It implements a layered DWH architecture (`raw → stg → core → dm`) using PostgreSQL, dbt, Python and Apache Superset, with ingestion observability, automated data quality testing and BI dashboards for financial analysis.
 
 
 ## Live Demo
@@ -70,12 +70,14 @@ Current implementation includes:
 - Scheduled S3 polling and processing of newly uploaded files
 - Idempotent file processing backed by an ingestion registry
 - Automatic dbt execution after successful data ingestion
+- Incremental exchange rate ingestion from the Bank of Russia (CBR)
 
 ### Data Warehouse
 
 - Layered warehouse architecture with `raw`, `stg`, `core`, `dm`, and `infra` schemas
 - dbt transformations, data tests, and documentation
 - Analytics-ready data marts for financial reporting
+- Multi-currency transaction and account balance marts with as-of exchange rate conversion
 
 ### Orchestration and Observability
 
@@ -588,6 +590,5 @@ Caddy is not part of the Docker Compose stack.
 
 Planned improvements:
 
-- Multi-currency transaction and balance support
 - AI-powered analytics assistant
 - Alerting and anomaly detection

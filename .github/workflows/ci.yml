@@ -124,12 +124,19 @@ jobs:
         working-directory: dbt
         run: sqlfluff lint . --config ../tests/ci/sqlfluff.cfg
 
-      - name: Load synthetic raw data
+      - name: Load synthetic raw money flow data
         working-directory: infra/deploy
         run: |
           docker compose exec -T postgres \
             sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
             < ../../tests/ci/raw_money_flow.sql
+
+      - name: Load synthetic exchange rate data
+        working-directory: infra/deploy
+        run: |
+          docker compose exec -T postgres \
+            sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+            < ../../tests/ci/raw_exchange_rate.sql
 
       - name: Run dbt build
         working-directory: dbt

@@ -42,6 +42,8 @@ models:
       - name: currency
         description: >
           Currency code of the transaction normalized to upper case.
+        tests:
+          - not_null
 
       - name: parent_category
         description: >
@@ -136,3 +138,51 @@ models:
         description: >
           Identifier of the ingestion batch from infra.ingestion_file_registry.
           NULL for seed-based opening balance rows.
+
+
+  - name: core__exchange_rate
+    description: >
+      Canonical fact table for daily exchange rates, materialized from
+      stg__exchange_rate for downstream analytical marts.
+
+    tests:
+      - unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['base_currency', 'rate_date']
+
+    columns:
+      - name: raw_id
+        description: Stable technical identifier inherited from the raw layer.
+        tests:
+          - not_null
+          - unique
+
+      - name: source
+        description: Exchange-rate source identifier.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['cbr']
+
+      - name: rate_date
+        description: Rate date.
+        tests:
+          - not_null
+
+      - name: base_currency
+        description: Currency the rate is quoted from.
+        tests:
+          - not_null
+
+      - name: quote_currency
+        description: Currency the rate is quoted to.
+        tests:
+          - not_null
+
+      - name: rate
+        description: >
+          Exchange rate: amount of quote_currency per 1 unit of base_currency.
+        tests:
+          - not_null
+          - positive

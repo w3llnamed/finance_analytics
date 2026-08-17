@@ -35,9 +35,9 @@ CREATE TABLE IF NOT EXISTS raw.money_flow
 
 
 /* =======================================================
-   exchange_rates
+   exchange_rate
    =======================================================*/
-CREATE TABLE IF NOT EXISTS raw.exchange_rates
+CREATE TABLE IF NOT EXISTS raw.exchange_rate
 (
     raw_id              BIGSERIAL PRIMARY KEY,
 
@@ -53,6 +53,6 @@ CREATE TABLE IF NOT EXISTS raw.exchange_rates
     ingested_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     ingested_by         TEXT        NOT NULL DEFAULT CURRENT_USER,
 
-    CONSTRAINT ux_exchange_rates_source_date_pair
+    CONSTRAINT ux_exchange_rate_source_date_pair
         UNIQUE (source, rate_date, base_currency, quote_currency)
 );

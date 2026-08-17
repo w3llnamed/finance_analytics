@@ -1,0 +1,231 @@
+version: 2
+
+models:
+  - name: dm__fact_transaction
+    description: >
+      Analytical transaction-level mart enriched with expense and account
+      classifications based on active tags and account attributes.
+      Each transaction is expanded into five time grains (Day, Week, Month,
+      Quarter, and Year) to support dynamic period selection and dashboard
+      cross-filtering.
+      Each transaction is further expanded into one row per supported
+      target currency, carrying amount_abs_converted (converted using the
+      exchange rate closest to, and not after, the transaction date), so
+      any aggregation must filter to a single period_grain and a single
+      target_currency.
+
+    columns:
+      - name: transaction_date
+        description: >
+          Original transaction date and time.
+        tests:
+          - not_null
+
+      - name: account
+        description: >
+          Account associated with the transaction.
+
+      - name: currency
+        description: >
+          Original transaction currency.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('core__exchange_rate')
+                field: base_currency
+              config:
+                where: "currency != 'RUB'"
+
+      - name: parent_category
+        description: >
+          Parent category of the transaction.
+
+      - name: category
+        description: >
+          Detailed category of the transaction.
+
+      - name: tags
+        description: >
+          Comma-separated transaction tags.
+
+      - name: note
+        description: >
+          Transaction note.
+
+      - name: transaction_type
+        description: >
+          Transaction type.
+        tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - 'Transfer out'
+                  - 'Transfer in'
+                  - 'Expense'
+                  - 'Income'
+                  - 'Opening balance'
+
+      - name: expense_type
+        description: >
+          Expense classification based on recurring and reserve-funded expense tags.
+        tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - 'Recurring'
+                  - 'Reserve-funded'
+                  - 'Ad hoc'
+
+      - name: account_type
+        description: >
+          Account classification based on reserve and credit account flags.
+        tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - 'Standard'
+                  - 'Reserve'
+                  - 'Credit'
+
+      - name: period_grain
+        description: >
+          Time grain used for the categorical period representation.
+          Each source transaction is represented once for every supported grain.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - 'Day'
+                  - 'Week'
+                  - 'Month'
+                  - 'Quarter'
+                  - 'Year'
+
+      - name: period
+        description: >
+          ISO-like categorical period label corresponding to period_grain,
+          such as 2026-08-14, 2026-08-10, 2026-08, 2026-Q3, or 2026.
+        tests:
+          - not_null
+
+      - name: target_currency
+        description: >
+          Currency the transaction amount is converted into. Each transaction
+          is represented once for every supported target currency (tracked
+          FX currencies, RUB, and any currency actually used in transactions),
+          allowing a single dashboard filter to select the reporting currency.
+        tests:
+          - not_null
+
+      - name: amount_abs_converted
+        description: >
+          Absolute transaction amount converted into target_currency using
+          the exchange rate closest to (and not after) the transaction date.
+          NULL when no exchange rate history exists for the transaction
+          currency or the target currency, except for the identity case
+          (currency = target_currency), which is always exact.
+
+
+  - name: dm__account_balance
+    description: >
+      Analytical mart with historical account balance snapshots at the end
+      of each period, for the Balance over time dashboard. Each account is
+      represented once per (period_grain, period, target_currency), with
+      a snapshot generated even for periods without transactions via a
+      daily calendar spine. Larger grains are independently computed
+      end-of-period states, not sums of smaller-grain snapshots.
+
+    tests:
+      - unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['account', 'period_grain', 'period', 'target_currency']
+
+    columns:
+      - name: account
+        description: >
+          Account the balance snapshot belongs to.
+        tests:
+          - not_null
+
+      - name: account_type
+        description: >
+          Account classification based on reserve and credit account flags.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - 'Standard'
+                  - 'Reserve'
+                  - 'Credit'
+
+      - name: period_grain
+        description: >
+          Time grain used for the categorical period representation.
+          Each account is represented once for every supported grain.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - 'Day'
+                  - 'Week'
+                  - 'Month'
+                  - 'Quarter'
+                  - 'Year'
+
+      - name: period
+        description: >
+          ISO-like categorical period label corresponding to period_grain,
+          such as 2026-08-14, 2026-08-10, 2026-08, 2026-Q3, or 2026.
+        tests:
+          - not_null
+
+      - name: period_end
+        description: >
+          Calendar date the snapshot represents: the latest spine day
+          within the period. Equal to the calendar end of the period for
+          completed periods, or to the current date for the still
+          in-progress period.
+        tests:
+          - not_null
+
+      - name: currency
+        description: >
+          Account's native currency, derived from its opening balance.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('core__exchange_rate')
+                field: base_currency
+              config:
+                where: "currency != 'RUB'"
+
+      - name: balance
+        description: >
+          Cumulative signed balance of the account, in its native currency,
+          as of period_end (sum of all transaction amounts on or before
+          period_end).
+        tests:
+          - not_null
+
+      - name: target_currency
+        description: >
+          Currency the balance is converted into. Each snapshot is
+          represented once for every supported target currency (tracked
+          FX currencies, RUB, and any currency actually used in
+          transactions), allowing a single dashboard filter to select the
+          reporting currency.
+        tests:
+          - not_null
+
+      - name: balance_converted
+        description: >
+          Balance converted into target_currency using the exchange rate
+          closest to (and not after) period_end. NULL when no exchange
+          rate history exists for the account currency or the target
+          currency, except for the identity case
+          (currency = target_currency), which is always exact.

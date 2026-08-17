@@ -1,6 +1,6 @@
 # Ingestion Layer
 
-This directory contains the Python-based ingestion pipeline for loading financial transaction data from S3-compatible object storage into the PostgreSQL raw layer.
+This directory contains the Python-based ingestion pipelines for loading financial data into the PostgreSQL raw layer: Money Flow transactions from S3-compatible object storage, and official exchange rates from an external FX API.
 
 
 ## Overview
@@ -134,6 +134,60 @@ The ingestion pipeline validates:
 - missing required columns
 
 Failures are registered in ingestion metadata tables for observability purposes.
+
+
+## Exchange Rate Ingestion
+
+A second ingestion script loads official exchange rates from an external API into `raw.exchange_rate`:
+
+```
+ingestion/load_exchange_rates.py
+```
+
+Unlike Money Flow ingestion, it does not read from S3 and does not depend on `infra.ingestion_file_registry`.
+
+
+### Source
+
+The only currently supported source is the Bank of Russia (`cbr`).
+
+
+### Refresh Timing
+
+Ingestion state per source and currency is tracked in `infra.fx_ingestion_state`.
+
+A refresh is skipped unless the source has never been checked, or the last check is at least `FX_REFRESH_INTERVAL_MINUTES` old, so the external API is not called on every scheduled flow run.
+
+
+### Backfill and Incremental Requests
+
+For a currency requested for the first time, the request window starts `FX_INITIAL_LOOKBACK_DAYS` before the earliest Money Flow transaction date.
+
+For a currency already loaded before, ingestion re-requests the last `FX_RELOAD_LOOKBACK_DAYS` days on each due refresh, to pick up rates the source may publish or correct after the fact.
+
+
+### Raw Load
+
+Fetched rates are upserted into `raw.exchange_rate`, keyed on `(source, rate_date, base_currency, quote_currency)`. An existing row is updated only when its values actually changed.
+
+
+### Environment Variables
+
+- `FX_SOURCE` - currently only `cbr` is supported
+- `FX_CURRENCIES` - comma-separated currency codes to track
+- `FX_REFRESH_INTERVAL_MINUTES`, `FX_INITIAL_LOOKBACK_DAYS`, `FX_RELOAD_LOOKBACK_DAYS`, `FX_HTTP_TIMEOUT_SECONDS`
+
+Configuration is loaded from the same `infra/deploy/.env` file used by Money Flow ingestion.
+
+
+### Running Exchange Rate Ingestion
+
+```
+docker exec -it \
+  -w /opt/finance_analytics \
+  prefect-worker \
+  python ingestion/load_exchange_rates.py
+```
 
 
 ## Orchestration

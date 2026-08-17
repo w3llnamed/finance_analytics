@@ -173,6 +173,14 @@ tests/ci/raw_money_flow.sql
 The fixture provides the minimum source and ingestion-registry state required
 for the dbt project to execute against realistic input structures.
 
+Synthetic exchange rate data is loaded separately from:
+
+```
+tests/ci/raw_exchange_rate.sql
+```
+
+This exercises currency conversion logic in `core` and `dm` models, which would otherwise never run against non-empty rate data in CI.
+
 
 ### dbt Build
 
@@ -230,5 +238,6 @@ infra/deploy/docker-compose.yml
 infra/deploy/prefect-worker.Dockerfile
 requirements.txt
 tests/ci/raw_money_flow.sql
+tests/ci/raw_exchange_rate.sql
 tests/ci/sqlfluff.cfg
 ```

@@ -7,6 +7,9 @@ sources:
       - name: money_flow
         description: "Raw snapshot of personal money flow transactions loaded from source files."
 
+      - name: exchange_rate
+        description: "Raw snapshot of exchange rates fetched from official FX sources (e.g. CBR)."
+
   - name: infra
     schema: infra
     tables:

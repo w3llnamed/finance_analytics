@@ -1,5 +1,3 @@
-import csv
-import io
 import os
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
@@ -45,16 +43,14 @@ FX_INITIAL_LOOKBACK_DAYS = int(os.getenv("FX_INITIAL_LOOKBACK_DAYS", "14"))
 FX_RELOAD_LOOKBACK_DAYS = int(os.getenv("FX_RELOAD_LOOKBACK_DAYS", "7"))
 FX_HTTP_TIMEOUT_SECONDS = int(os.getenv("FX_HTTP_TIMEOUT_SECONDS", "30"))
 
-RAW_TABLE = "raw.exchange_rates"
+RAW_TABLE = "raw.exchange_rate"
 STATE_TABLE = "infra.fx_ingestion_state"
 
 CBR_CATALOG_URL = "https://www.cbr.ru/scripts/XML_daily.asp"
 CBR_DYNAMIC_URL = "https://www.cbr.ru/scripts/XML_dynamic.asp"
-ECB_API_URL = "https://data-api.ecb.europa.eu/service/data/EXR"
 
 SOURCE_REFERENCE_CURRENCY = {
     "cbr": "RUB",
-    "ecb": "EUR",
 }
 
 
@@ -323,51 +319,6 @@ def fetch_cbr_rates(
 
 
 # =============================================================================
-# ECB PROVIDER
-# =============================================================================
-def fetch_ecb_rates(
-    currency_code: str,
-    start_date: date,
-    end_date: date,
-) -> list[ExchangeRateRow]:
-    series_key = f"D.{currency_code}.EUR.SP00.A"
-    params = urlencode(
-        {
-            "startPeriod": start_date.isoformat(),
-            "endPeriod": end_date.isoformat(),
-            "format": "csvdata",
-        }
-    )
-    csv_data = download_bytes(f"{ECB_API_URL}/{series_key}?{params}")
-    csv_text = csv_data.decode("utf-8-sig")
-    reader = csv.DictReader(io.StringIO(csv_text))
-
-    rows: list[ExchangeRateRow] = []
-
-    for record in reader:
-        rate_date_text = (record.get("TIME_PERIOD") or "").strip()
-        value = (record.get("OBS_VALUE") or "").strip()
-
-        if not rate_date_text or not value:
-            continue
-
-        rows.append(
-            ExchangeRateRow(
-                source="ecb",
-                source_rate_key=series_key,
-                rate_date_text=rate_date_text,
-                rate_date=date.fromisoformat(rate_date_text),
-                base_currency="EUR",
-                base_amount="1",
-                quote_currency=currency_code,
-                quote_amount=value,
-            )
-        )
-
-    return rows
-
-
-# =============================================================================
 # RAW LOAD
 # =============================================================================
 def upsert_exchange_rates(conn, rows: list[ExchangeRateRow]) -> int:
@@ -428,7 +379,7 @@ def upsert_exchange_rates(conn, rows: list[ExchangeRateRow]) -> int:
 # =============================================================================
 def load_exchange_rates() -> str:
     """
-    Incrementally load official exchange rates into raw.exchange_rates.
+    Incrementally load official exchange rates into raw.exchange_rate.
 
     Returns:
         "loaded"  - at least one raw rate row was inserted or changed
@@ -491,12 +442,6 @@ def load_exchange_rates() -> str:
                     start_date=start_date,
                     end_date=end_date,
                     catalog=cbr_catalog,
-                )
-            elif FX_SOURCE == "ecb":
-                rows = fetch_ecb_rates(
-                    currency_code=currency_code,
-                    start_date=start_date,
-                    end_date=end_date,
                 )
             else:
                 raise ValueError(f"Unsupported FX source: {FX_SOURCE}")
