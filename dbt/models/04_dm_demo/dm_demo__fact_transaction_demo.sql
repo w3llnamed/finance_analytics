@@ -5,6 +5,7 @@
 
    Source:
        core.fact_transaction
+       core.exchange_rate
        seed.recurring_expense_tag
        seed.reserve_funded_expense_tag
        seed.dim_accounts
@@ -14,7 +15,9 @@
    Description:
        The model mirrors dm.fact_transaction but replaces real accounts and
        categories with demo values and masks transaction amounts using
-       category-level masking parameters.
+       category-level masking parameters before any currency conversion.
+       Currency codes and exchange rates are not anonymized: they do not
+       identify a person.
 
        Each transaction is expanded into five time grains:
        Day, Week, Month, Quarter and Year.
@@ -22,6 +25,12 @@
        This allows demo dashboards to use categorical period axes while
        preserving dynamic grain selection and dashboard cross-filtering
        by period.
+
+       Each transaction is further expanded into one row per supported
+       target currency, carrying amount_abs_converted (the masked absolute
+       amount converted using the exchange rate closest to, and not after,
+       the transaction date), so any aggregation must filter to a single
+       period_grain and a single target_currency.
    ============================================================================= */
 
 WITH source AS (
@@ -30,7 +39,7 @@ WITH source AS (
         transaction_ts,
         account,
         amount,
-        amount_abs,
+        currency,
         parent_category,
         category,
         tags,
@@ -88,14 +97,14 @@ final AS (
         transaction_ts AS transaction_date,
         demo_account AS account,
 
-        ROUND(amount * amount_factor, 2) AS amount,
         ABS(ROUND(amount * amount_factor, 2)) AS amount_abs,
 
+        currency,
         demo_parent_category AS parent_category,
         demo_category AS category,
 
-        NULL::text AS tags,
-        NULL::text AS note,
+        NULL::TEXT AS tags,
+        NULL::TEXT AS note,
 
         CASE
             WHEN transaction_type = 'transfer_out' THEN 'Transfer out'
@@ -133,7 +142,7 @@ periodized AS (
         VALUES
 
         (
-            'Day'::text,
+            'Day'::TEXT,
             TO_CHAR(
                 final.transaction_date,
                 'YYYY-MM-DD'
@@ -141,7 +150,7 @@ periodized AS (
         ),
 
         (
-            'Week'::text,
+            'Week'::TEXT,
             TO_CHAR(
                 DATE_TRUNC(
                     'week',
@@ -152,7 +161,7 @@ periodized AS (
         ),
 
         (
-            'Month'::text,
+            'Month'::TEXT,
             TO_CHAR(
                 final.transaction_date,
                 'YYYY-MM'
@@ -160,7 +169,7 @@ periodized AS (
         ),
 
         (
-            'Quarter'::text,
+            'Quarter'::TEXT,
             TO_CHAR(
                 final.transaction_date,
                 'YYYY'
@@ -168,11 +177,11 @@ periodized AS (
             || '-Q'
             || EXTRACT(
                 QUARTER FROM final.transaction_date
-            )::integer::text
+            )::INTEGER::TEXT
         ),
 
         (
-            'Year'::text,
+            'Year'::TEXT,
             TO_CHAR(
                 final.transaction_date,
                 'YYYY'
@@ -184,7 +193,72 @@ periodized AS (
         period
     )
 
+),
+
+target_currencies AS (
+
+    SELECT DISTINCT base_currency AS target_currency
+    FROM {{ ref('core__exchange_rate') }}
+
+    UNION
+
+    SELECT 'RUB'
+
+    UNION
+
+    SELECT DISTINCT currency
+    FROM {{ ref('core__fact_transaction') }}
+
+),
+
+converted AS (
+
+    SELECT
+        periodized.transaction_date,
+        periodized.account,
+        periodized.currency,
+        periodized.parent_category,
+        periodized.category,
+        periodized.tags,
+        periodized.note,
+        periodized.transaction_type,
+        periodized.expense_type,
+        periodized.account_type,
+        periodized.period_grain,
+        periodized.period,
+        tc.target_currency,
+
+        CASE
+            WHEN periodized.currency = tc.target_currency THEN periodized.amount_abs
+            WHEN periodized.currency = 'RUB' THEN periodized.amount_abs / NULLIF(target_fx.rate, 0)
+            WHEN tc.target_currency = 'RUB' THEN periodized.amount_abs * tx_fx.rate
+            ELSE periodized.amount_abs * tx_fx.rate / NULLIF(target_fx.rate, 0)
+        END AS amount_abs_converted
+
+    FROM periodized
+    CROSS JOIN target_currencies AS tc
+
+    LEFT JOIN LATERAL (
+        SELECT er.rate
+        FROM {{ ref('core__exchange_rate') }} AS er
+        WHERE
+            er.base_currency = periodized.currency
+            AND er.rate_date <= periodized.transaction_date::DATE
+        ORDER BY er.rate_date DESC
+        LIMIT 1
+    ) AS tx_fx ON periodized.currency <> 'RUB' AND periodized.currency <> tc.target_currency
+
+    LEFT JOIN LATERAL (
+        SELECT er.rate
+        FROM {{ ref('core__exchange_rate') }} AS er
+        WHERE
+            er.base_currency = tc.target_currency
+            AND er.rate_date <= periodized.transaction_date::DATE
+        ORDER BY er.rate_date DESC
+        LIMIT 1
+    ) AS target_fx ON tc.target_currency <> 'RUB' AND periodized.currency <> tc.target_currency
+
 )
 
 SELECT *
-FROM periodized
+FROM converted

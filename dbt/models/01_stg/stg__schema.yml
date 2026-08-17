@@ -9,6 +9,20 @@ models:
       normalizes currency codes, parses transaction date and numeric amounts,
       and derives helper flags for downstream core models.
 
+    tests:
+      - unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [
+              'source_number',
+              'transaction_date',
+              'account',
+              'amount',
+              'currency',
+              'transfer_account',
+              'transfer_amount',
+              'transfer_currency'
+            ]
+
     columns:
       - name: raw_id
         description: Technical primary key from raw layer.
@@ -26,12 +40,18 @@ models:
 
       - name: account
         description: Account name after basic text cleanup.
+        tests:
+          - not_null
 
       - name: amount
         description: Parsed transaction amount in source currency as NUMERIC(18,2).
+        tests:
+          - not_null
 
       - name: currency
         description: Transaction currency normalized to upper case.
+        tests:
+          - not_null
 
       - name: parent_category
         description: Top-level category after basic text cleanup.
@@ -94,5 +114,81 @@ models:
 
       - name: is_transfer
         description: Flag showing whether the row represents a transfer transaction.
+        tests:
+          - not_null
+
+
+  - name: stg__exchange_rate
+    description: >
+      Staging model for raw exchange rates. Normalizes source-specific
+      date formats and nominal-based quoting into a per-unit rate.
+
+    tests:
+      - unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['base_currency', 'rate_date']
+
+    columns:
+      - name: raw_id
+        description: Technical primary key from raw layer.
+        tests:
+          - not_null
+          - unique
+
+      - name: source
+        description: Exchange-rate source identifier.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['cbr']
+
+      - name: source_rate_key
+        description: Source-specific identifier for the rate series.
+        tests:
+          - not_null
+
+      - name: rate_date
+        description: Parsed rate date.
+        tests:
+          - not_null
+
+      - name: base_currency
+        description: Currency the rate is quoted from, normalized to upper case.
+        tests:
+          - not_null
+
+      - name: base_amount
+        description: Parsed base amount/nominal as NUMERIC(18,6).
+        tests:
+          - not_null
+          - positive
+
+      - name: quote_currency
+        description: Currency the rate is quoted to, normalized to upper case.
+        tests:
+          - not_null
+
+      - name: quote_amount
+        description: Parsed quote amount/value as NUMERIC(18,6).
+        tests:
+          - not_null
+          - positive
+
+      - name: rate
+        description: >
+          Normalized exchange rate: amount of quote_currency per 1 unit
+          of base_currency.
+        tests:
+          - not_null
+          - positive
+
+      - name: ingested_at
+        description: Timestamp when the row was last ingested or updated in raw.
+        tests:
+          - not_null
+
+      - name: ingested_by
+        description: Technical user or process that loaded the row.
         tests:
           - not_null

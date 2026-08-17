@@ -2,6 +2,44 @@ version: 2
 
 macros:
 
+  - name: test_positive
+    description: >
+      Validates that column values are strictly positive (> 0).
+      Used for amount and rate columns where a zero or negative
+      value indicates a parsing or source data error.
+
+    arguments:
+
+      - name: model
+        type: Relation
+        description: >
+          Model containing the column to validate.
+
+      - name: column_name
+        type: string
+        description: >
+          Column to check for non-positive values.
+
+
+  - name: test_unique_combination_of_columns
+    description: >
+      Validates that the given combination of columns is unique
+      across the model. Used to enforce composite business keys
+      that cannot be expressed with a single-column unique test.
+
+    arguments:
+
+      - name: model
+        type: Relation
+        description: >
+          Model to validate.
+
+      - name: combination_of_columns
+        type: list
+        description: >
+          List of column names that together must be unique.
+
+
   - name: test_active_seed_tags_exist_in_raw_tags
     description: >
       Validates that every active tag defined in the seed

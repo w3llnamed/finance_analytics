@@ -31,6 +31,25 @@ the current dbt models and tests.
 The fixture runs only against the temporary PostgreSQL database created by CI.
 
 
+## Synthetic Exchange Rate Data
+
+The file:
+
+```
+raw_exchange_rate.sql
+```
+
+inserts synthetic exchange rates directly into `raw.exchange_rate`, so that currency conversion logic in `core` and `dm` models can be exercised without a real CBR API call.
+
+It provides:
+
+- rates for a tracked currency present in the Money Flow fixture (USD), covering the fixture's transaction dates
+- rates for a currency not used by any fixture transaction (KGS), to exercise cross-currency conversion through RUB
+- a rate dated on the current day, so the most recent account balance snapshot also has exchange rate coverage
+
+The fixture runs only against the temporary PostgreSQL database created by CI.
+
+
 ## Private Seed
 
 The required private account seed is not stored in this directory.

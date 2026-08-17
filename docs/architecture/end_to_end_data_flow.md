@@ -16,15 +16,16 @@
 - [Step 7: CSV Download and Validation](#step-7-csv-download-and-validation)
 - [Step 8: Raw Layer Loading](#step-8-raw-layer-loading)
 - [Step 9: Ingestion Completion and dbt Trigger](#step-9-ingestion-completion-and-dbt-trigger)
-- [Step 10: dbt Build](#step-10-dbt-build)
-- [Step 11: Staging Layer](#step-11-staging-layer)
-- [Step 12: Core Layer](#step-12-core-layer)
-- [Step 13: Analytical Mart](#step-13-analytical-mart)
-- [Step 14: Optional Demo Mart](#step-14-optional-demo-mart)
-- [Step 15: Data Quality Tests](#step-15-data-quality-tests)
-- [Step 16: Observability Models](#step-16-observability-models)
-- [Step 17: dbt Execution History](#step-17-dbt-execution-history)
-- [Step 18: Superset Consumption](#step-18-superset-consumption)
+- [Step 10: Exchange Rate Ingestion](#step-10-exchange-rate-ingestion)
+- [Step 11: dbt Build](#step-11-dbt-build)
+- [Step 12: Staging Layer](#step-12-staging-layer)
+- [Step 13: Core Layer](#step-13-core-layer)
+- [Step 14: Analytical Marts](#step-14-analytical-marts)
+- [Step 15: Optional Demo Mart](#step-15-optional-demo-mart)
+- [Step 16: Data Quality Tests](#step-16-data-quality-tests)
+- [Step 17: Observability Models](#step-17-observability-models)
+- [Step 18: dbt Execution History](#step-18-dbt-execution-history)
+- [Step 19: Superset Consumption](#step-19-superset-consumption)
 - [Failure and Retry Logic](#failure-and-retry-logic)
 - [Current Implementation Constraints](#current-implementation-constraints)
 - [Data State and Ownership](#data-state-and-ownership)
@@ -116,6 +117,8 @@ flowchart LR
         CSV --> S3
     end
 
+    S3 --> INGESTION
+
     subgraph ORCHESTRATION["Orchestration"]
         direction TB
         PREFECT_SERVER[Prefect Server and Services]
@@ -128,12 +131,23 @@ flowchart LR
         PREFECT_WORKER --> DBT
     end
 
-    subgraph POSTGRES["PostgreSQL DWH"]
+    subgraph LANDING["PostgreSQL: Landing"]
         direction TB
 
         REGISTRY[infra.ingestion_file_registry]
+        FX_STATE[infra.fx_ingestion_state]
         RAW[raw.money_flow]
+        RAW_FX[raw.exchange_rate]
         SEEDS[seeds]
+    end
+
+    INGESTION --> REGISTRY
+    INGESTION --> RAW
+    INGESTION --> FX_STATE
+    INGESTION --> RAW_FX
+
+    subgraph WAREHOUSE["PostgreSQL: Warehouse"]
+        direction TB
 
         STG[stg]
         CORE[core]
@@ -144,27 +158,21 @@ flowchart LR
         INFRA_MODELS[infra freshness and volume monitoring]
         DBT_HISTORY[infra dbt observability tables]
 
-        RAW --> STG
-        REGISTRY -.-> STG
-
         STG --> CORE
-        SEEDS --> CORE
 
         CORE --> DM
-        SEEDS --> DM
-
         CORE --> DM_DEMO
-        SEEDS --> DM_DEMO
-
-        REGISTRY --> INFRA_MODELS
     end
 
+    RAW --> STG
+    RAW_FX --> STG
+    REGISTRY -.-> STG
+    SEEDS --> CORE
+    SEEDS --> DM
+    SEEDS --> DM_DEMO
+    REGISTRY --> INFRA_MODELS
+
     SUPERSET[Apache Superset]
-
-    S3 --> INGESTION
-
-    INGESTION --> REGISTRY
-    INGESTION --> RAW
 
     DBT --> STG
     DBT --> INFRA_MODELS
@@ -321,26 +329,30 @@ This prevents multiple ingestion processes from handling the same source at the 
 
 The Prefect Worker polls `finance-process-pool` and executes the flow named `money-flow-s3-ingestion-flow`.
 
-The flow contains two tasks:
+The flow contains three tasks:
 
 - `load-money-flow-from-s3`
+- `load-exchange-rates`
 - `run-dbt-build`
 
-The ingestion task calls:
+The ingestion tasks call:
 
 ```
 load_money_flow_from_s3()
+load_exchange_rates()
 ```
 
-The task returns one of the expected orchestration results:
+Both tasks run sequentially, Money Flow ingestion first, so that exchange-rate backfill can see the latest Money Flow transaction dates.
+
+Each task returns one of the expected orchestration results:
 
 - `loaded`
 - `skipped`
 
-The dbt task handles the result as follows:
+The dbt task handles the combined result as follows:
 
-- `loaded` starts `dbt build`
-- `skipped` ends the flow without running dbt
+- `dbt build` starts if either ingestion task returned `loaded`
+- The flow ends without running dbt only when both tasks returned `skipped`
 - Any other result raises an error
 
 
@@ -532,7 +544,7 @@ After a successful commit, ingestion returns:
 loaded
 ```
 
-Prefect then starts:
+Prefect then runs the exchange-rate ingestion task (see Step 10) and triggers `dbt build` based on the combined result of both ingestion tasks, as described in Step 4:
 
 ```
 dbt build \
@@ -548,10 +560,64 @@ The command runs with:
 
 as its working directory.
 
-When ingestion returns `skipped`, the dbt task logs that no new file was loaded and exits without running dbt.
+When the Money Flow ingestion task returns `skipped`, `dbt build` still runs if the exchange-rate ingestion task returned `loaded`. The flow ends without running dbt only when both tasks returned `skipped`.
 
 
-## Step 10: dbt Build
+## Step 10: Exchange Rate Ingestion
+
+The exchange-rate ingestion task calls:
+
+```
+load_exchange_rates()
+```
+
+It loads official exchange rates from a single supported source, the Bank of Russia (`cbr`), into `raw.exchange_rate`.
+
+
+### Refresh timing
+
+Ingestion state per source and currency is tracked in:
+
+```
+infra.fx_ingestion_state
+```
+
+A refresh is due only when the source has never been checked, or when the last check is at least `FX_REFRESH_INTERVAL_MINUTES` old (default 360 minutes). This prevents calling the external CBR API on every scheduled flow run.
+
+If no configured currency is due for a refresh, ingestion returns `skipped` without any external request.
+
+
+### Backfill
+
+For a currency requested for the first time, the request start date is `FX_INITIAL_LOOKBACK_DAYS` (default 14) before the earliest Money Flow transaction date, so that a prior official rate exists for weekends and holidays around the first transaction.
+
+If no Money Flow transactions exist yet, the lookback is measured from the current date instead.
+
+
+### Incremental requests
+
+For a currency that was already loaded before, ingestion re-requests the last `FX_RELOAD_LOOKBACK_DAYS` days (default 7) up to the current date, rather than only the days since the last check. This re-fetches recently published rates that the source may add or correct after the fact, for example rates for holidays published a few days late.
+
+
+### Raw load
+
+Fetched rates are upserted into `raw.exchange_rate`, keyed on `(source, rate_date, base_currency, quote_currency)`. An existing row is updated only when its stored values actually differ from the newly fetched ones; `ingested_at` and `ingested_by` are refreshed only on that update.
+
+Ingestion returns `loaded` when at least one row was inserted or changed, and `skipped` when the source was checked successfully but no raw data changed.
+
+
+### Currency configuration
+
+Configuration is read from `infra/deploy/.env`:
+
+- `FX_SOURCE` - currently only `cbr` is supported
+- `FX_CURRENCIES` - comma-separated currency codes to track (default `USD,KGS`)
+- `FX_REFRESH_INTERVAL_MINUTES`, `FX_INITIAL_LOOKBACK_DAYS`, `FX_RELOAD_LOOKBACK_DAYS`, `FX_HTTP_TIMEOUT_SECONDS`
+
+A currency equal to the source's own reference currency (`RUB` for `cbr`) is skipped, since its rate to itself is always 1 and is not requested from the API.
+
+
+## Step 11: dbt Build
 
 The dbt project uses the following model configuration:
 
@@ -584,7 +650,7 @@ At the end of the invocation, dbt runs two hooks:
 - `log_model_runs_to_infra()`
 
 
-## Step 11: Staging Layer
+## Step 12: Staging Layer
 
 The staging model is:
 
@@ -666,7 +732,26 @@ The model derives `is_transfer` as true when at least one of the following is pr
 No account mapping, category mapping, opening balance logic or analytical classification is applied in `stg`.
 
 
-## Step 12: Core Layer
+### Exchange rate normalization
+
+A second staging model exists for currency exchange rates:
+
+```
+stg.exchange_rate
+```
+
+Unlike `stg.fact_transaction`, it does not filter by ingestion batch, because `raw.exchange_rate` is upserted rather than snapshot-replaced.
+
+The model:
+
+- Trims text fields and converts empty strings into `NULL`
+- Normalizes currency codes to upper case
+- Parses the source-specific rate date format (`DD.MM.YYYY` for `cbr`) into a date
+- Removes spaces and replaces a comma decimal separator with a dot before converting amounts to `NUMERIC(18, 6)`
+- Derives `rate` as `quote_amount / base_amount`, normalizing away source-specific nominal-based quoting (for example, a rate quoted per 10 units of currency) into a per-unit rate
+
+
+## Step 13: Core Layer
 
 The canonical model is:
 
@@ -803,7 +888,18 @@ The model adds:
 The join is a left join. A missing account mapping produces `NULL` account flags in the model and is detected later by an error-level dbt test.
 
 
-## Step 13: Analytical Mart
+### Exchange rate
+
+A second canonical model exists for exchange rates:
+
+```
+core.exchange_rate
+```
+
+It materializes `stg.exchange_rate` as a table without additional business logic, so that downstream marts can `ref()` a stable, physical relation instead of the staging view.
+
+
+## Step 14: Analytical Marts
 
 The private analytical mart is:
 
@@ -879,7 +975,37 @@ Canonical values are converted into display values:
 The mart exposes only the fields required by the analytical layer and does not retain all raw and ingestion metadata.
 
 
-## Step 14: Optional Demo Mart
+### Currency conversion
+
+Each transaction row is further expanded into one row per supported target currency: every currency present in `core.exchange_rate`, `RUB`, and every currency actually used in `core.fact_transaction`.
+
+For each row, `amount_abs_converted` is calculated using the exchange rate closest to, and not after, the transaction date. When the transaction currency equals the target currency, the amount is used unchanged. When no exchange rate history exists for the required currency, the converted amount is `NULL`.
+
+The mart does not expose the original unconverted `amount`/`amount_abs`, or the exchange rate itself. Any aggregation must filter to a single `target_currency`, in addition to a single `period_grain`.
+
+
+### Account balance mart
+
+A second private analytical mart represents balance snapshots rather than transactions:
+
+```
+dm.account_balance
+```
+
+One row represents the balance of one account, in one native currency, converted into one target currency, at the end of one period (`account`, `period_grain`, `period`, `target_currency`).
+
+#### Balance spine
+
+For each active account, a daily calendar spine is generated from the account's first canonical transaction (its opening balance) up to the current date, so that a snapshot exists even for periods without transactions. A running (cumulative) signed balance is calculated per account and day, then collapsed into one snapshot per (account, period_grain, period), keeping the balance as of the latest spine day within that period (`period_end`).
+
+Larger grains are not derived by summing smaller-grain snapshots: each grain independently recomputes its own end-of-period balance from the daily spine, so, for example, a quarterly balance is not the sum of its monthly balances.
+
+#### Currency conversion
+
+Balance conversion follows the same target-currency and as-of exchange-rate logic as `dm.fact_transaction`, applied to `period_end` instead of the transaction date. The exchange rate itself is not exposed; only `balance` (native currency) and `balance_converted` (target currency) are.
+
+
+## Step 15: Optional Demo Mart
 
 The optional anonymized mart is:
 
@@ -956,7 +1082,23 @@ The demo mart preserves:
 - Account classification
 
 
-## Step 15: Data Quality Tests
+### Currency conversion
+
+Like `dm.fact_transaction`, each transaction row is expanded into one row per supported target currency, and `amount_abs_converted` is calculated using the exchange rate closest to, and not after, the transaction date — but applied to the masked amount, not the real one.
+
+
+### Account balance demo mart
+
+A second anonymized mart mirrors `dm.account_balance`:
+
+```
+dm_demo.account_balance_demo
+```
+
+Each transaction amount is masked with `category_mapping_demo` before the daily balance spine is built (rather than masking the already-aggregated balance), so the demo balance stays arithmetically consistent with `dm_demo.fact_transaction_demo`. Rows without a category match, in particular opening balances, use an amount factor of `1.0`, the same fallback rule used elsewhere in the demo mart.
+
+
+## Step 16: Data Quality Tests
 
 `dbt build` executes schema tests, seed tests and singular tests.
 
@@ -986,6 +1128,7 @@ The staging model checks include:
 - Ingestion metadata is not null
 - Flow type is one of `income`, `expense` or `zero`
 - Transfer flag is not null
+- Exchange rate is positive and the (base currency, rate date) combination is unique
 
 
 ### Core tests
@@ -998,6 +1141,7 @@ The core model checks include:
 - Absolute amount is not null
 - Transaction type is accepted
 - Ingestion metadata fields required for canonical rows are populated
+- Exchange rate is positive and the (base currency, rate date) combination is unique
 
 
 ### Account dictionary coverage
@@ -1007,6 +1151,13 @@ The singular test `assert_core_accounts_exist_in_dim_accounts` returns every dis
 It has explicit severity `error`.
 
 This prevents unmanaged accounts from being silently accepted by downstream analytics.
+
+
+### Account currency consistency
+
+The singular test `assert_core_accounts_have_single_currency` returns every account with more than one distinct transaction currency in `core.fact_transaction`.
+
+It has explicit severity `error`. `dm.account_balance` sums transaction amounts per account as a single currency, so a mixed-currency account would silently corrupt the resulting balance.
 
 
 ### Expense tag dictionary tests
@@ -1035,7 +1186,7 @@ When demo mode is enabled, error-level singular tests verify:
 The demo model also checks accepted transaction, expense and account display values.
 
 
-## Step 16: Observability Models
+## Step 17: Observability Models
 
 
 ### Data freshness
@@ -1093,7 +1244,7 @@ The resulting status is:
 The model monitors snapshot row counts rather than incremental row changes because every ingestion loads a complete Money Flow export.
 
 
-## Step 17: dbt Execution History
+## Step 18: dbt Execution History
 
 The `on-run-end` hooks store dbt execution results in the `infra` schema.
 
@@ -1160,7 +1311,7 @@ Stored test metadata includes:
 - Update timestamp
 
 
-## Step 18: Superset Consumption
+## Step 19: Superset Consumption
 
 Superset connects to the analytical PostgreSQL database through read-only BI roles.
 
@@ -1388,6 +1539,8 @@ This differs from the usual semantic expectation of an absolute-value field and 
 
 - `infra.ingestion_file_registry` is the source of truth for file processing state
 - `raw.money_flow` contains source-preserving rows from successful ingestion snapshots
+- `infra.fx_ingestion_state` tracks refresh timing and incremental request state per exchange-rate source and currency
+- `raw.exchange_rate` contains source-preserving exchange rates, upserted rather than snapshot-replaced
 
 
 ### Transformation state
@@ -1453,13 +1606,27 @@ Contains:
 - Error handling
 
 
+### FX ingestion
+
+```
+ingestion/load_exchange_rates.py
+```
+
+Contains:
+
+- Environment loading
+- Refresh timing and state tracking
+- Initial backfill and incremental request windows
+- CBR API requests
+- Raw upserts
+
+
 ### PostgreSQL bootstrap
 
 ```
 infra/bootstrap/001_roles.sql
 infra/bootstrap/002_role_passwords.sh
 infra/bootstrap/003_db_settings.sql
-infra/bootstrap/004_extensions.sql
 infra/bootstrap/005_schemas.sql
 infra/bootstrap/006_grants.sql
 infra/bootstrap/010_raw_tables.sql
@@ -1472,11 +1639,12 @@ Contains:
 
 - Database roles and role passwords
 - Database-level settings
-- PostgreSQL extensions
 - DWH schemas
 - Role grants and privileges
 - Raw.money_flow
+- Raw.exchange_rate
 - Infra.ingestion_file_registry
+- Infra.fx_ingestion_state
 - Infrastructure and observability tables
 - Comments for raw and infrastructure database objects
 
@@ -1500,6 +1668,7 @@ Contains:
 
 ```
 dbt/models/01_stg/stg__fact_transaction.sql
+dbt/models/01_stg/stg__exchange_rate.sql
 ```
 
 Contains:
@@ -1509,12 +1678,14 @@ Contains:
 - Date and amount parsing
 - Flow type
 - Transfer flag
+- Exchange rate date and amount normalization
 
 
 ### Core logic
 
 ```
 dbt/models/02_core/core__fact_transaction.sql
+dbt/models/02_core/core__exchange_rate.sql
 ```
 
 Contains:
@@ -1524,12 +1695,14 @@ Contains:
 - Canonical transaction types
 - Stable transaction identifier
 - Account enrichment
+- Exchange rate materialization
 
 
 ### Private analytical logic
 
 ```
 dbt/models/03_dm/dm__fact_transaction.sql
+dbt/models/03_dm/dm__account_balance.sql
 ```
 
 Contains:
@@ -1538,12 +1711,15 @@ Contains:
 - Recurring and reserve-funded classification
 - Display transaction types
 - Account types
+- Currency conversion
+- Account balance spine
 
 
 ### Demo analytical logic
 
 ```
 dbt/models/04_dm_demo/dm_demo__fact_transaction_demo.sql
+dbt/models/04_dm_demo/dm_demo__account_balance_demo.sql
 ```
 
 Contains:
@@ -1552,6 +1728,8 @@ Contains:
 - Demo category mapping
 - Amount masking
 - Removal of tags and notes
+- Currency conversion (masked)
+- Account balance spine (masked)
 
 
 ### Observability logic

@@ -1,6 +1,6 @@
-# Demo Data Mart
+# Demo Data Marts
 
-This directory contains the optional anonymized data mart used for public dashboard demonstration.
+This directory contains the optional anonymized data marts used for public dashboard demonstration.
 
 The demo branch is disabled by default and is included in the dbt project only
 when the following environment variable is configured:
@@ -14,7 +14,7 @@ When `DBT_ENABLE_DEMO=False`, the models in this directory and the related singu
 
 ## Dependencies
 
-The demo mart is built from the canonical transaction model and additionally requires:
+The demo marts are built from the canonical transaction model and canonical exchange rates, and additionally require:
 
 - `dbt/seeds/private/dim_accounts_demo.csv`
 - `dbt/seeds/private/category_mapping_demo.csv`
@@ -27,13 +27,16 @@ It is excluded from version control because it is derived from private financial
 
 ## Anonymization
 
-The demo mart:
+The demo marts:
 
-- replaces real account names with demo account names
-- replaces real categories and parent categories with demo mappings
-- adjusts amounts using category-level masking coefficients
-- removes transaction tags and notes
-- preserves transaction types and analytical flags
+- replace real account names with demo account names
+- replace real categories and parent categories with demo mappings
+- adjust amounts using category-level masking coefficients
+- remove transaction tags and notes
+- preserve transaction types and analytical flags
+- convert masked amounts into a selectable target currency using historical exchange rates
+
+A second demo mart, `dm_demo__account_balance_demo`, represents account balance snapshots rather than transactions. It applies the same account and amount masking rules per transaction before building its balance spine, so its numbers stay consistent with `dm_demo__fact_transaction_demo`.
 
 The model does not fall back to real category values when a mapping is missing.
 

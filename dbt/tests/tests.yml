@@ -9,6 +9,15 @@ data_tests:
       Prevents unclassified or unmanaged accounts
       from appearing in downstream analytics.
 
+  - name: assert_core_accounts_have_single_currency
+    description: >
+      Validates that every active account in core__fact_transaction has
+      exactly one distinct currency across its transactions.
+
+      dm__account_balance sums signed amounts per account as if they were
+      a single currency; a mixed-currency account would silently corrupt
+      the resulting balance.
+
   - name: assert_recurring_expense_tag_has_at_most_one_active_row
     description: >
       Validates that the recurring_expense_tag seed contains
