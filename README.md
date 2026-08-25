@@ -592,3 +592,4 @@ Caddy is not part of the Docker Compose stack.
 Planned improvements:
 
 - Alerting and anomaly detection
+- AWS migration (Infrastructure as Code)
