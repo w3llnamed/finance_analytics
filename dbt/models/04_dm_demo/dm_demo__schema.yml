@@ -182,6 +182,17 @@ models:
         tests:
           - not_null
 
+      - name: is_latest_period
+        description: >
+          Indicates whether period_end is the latest available snapshot date
+          within the corresponding period_grain in the materialized mart.
+          Multiple rows can be TRUE because all accounts and target currencies
+          belonging to the latest period are marked. Intended for current-state
+          dashboard charts that must use the latest available data regardless
+          of the current calendar date.
+        tests:
+          - not_null
+
       - name: currency
         description: >
           Account's native currency, derived from its opening balance.

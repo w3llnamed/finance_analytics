@@ -231,7 +231,10 @@ final AS (
         period_grain,
         period,
         period_end,
-        balance
+        balance,
+        period_end = MAX(period_end) OVER (
+            PARTITION BY period_grain
+        ) AS is_latest_period
     FROM period_snapshot
     WHERE rn = 1
 
@@ -261,6 +264,7 @@ converted AS (
         final.period_grain,
         final.period,
         final.period_end,
+        final.is_latest_period,
         final.currency,
         final.balance,
         tc.target_currency,
@@ -303,6 +307,7 @@ SELECT
     period_grain,
     period,
     period_end,
+    is_latest_period,
     currency,
     balance,
     target_currency,
