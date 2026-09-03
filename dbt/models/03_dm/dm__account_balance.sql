@@ -29,9 +29,6 @@
           latest spine day within that period (period_end). Larger grains
           are never derived by summing smaller-grain snapshots; each grain
           recomputes its own end-of-period state from the daily spine.
-        - Mark the latest available period within each period grain with
-          is_latest_period, allowing current-state dashboard charts to avoid
-          relative date filters such as Current day or Last day.
         - Expand each snapshot into one row per supported target currency
           (tracked FX currencies, RUB, and any currency actually used in
           transactions), converting balance using the exchange rate closest
@@ -49,9 +46,7 @@ WITH accounts AS (
     SELECT
         account,
         MIN(transaction_ts)::DATE AS balance_start_date,
-        MAX(currency) FILTER (
-            WHERE transaction_type = 'opening_balance'
-        ) AS currency,
+        MAX(currency) FILTER (WHERE transaction_type = 'opening_balance') AS currency,
         BOOL_OR(is_reserve_account) AS is_reserve_account,
         BOOL_OR(is_credit_account) AS is_credit_account
     FROM {{ ref('core__fact_transaction') }}
@@ -68,9 +63,7 @@ daily_transaction_totals AS (
         SUM(amount) AS day_amount
     FROM {{ ref('core__fact_transaction') }}
     WHERE is_active_account IS TRUE
-    GROUP BY
-        account,
-        transaction_ts::DATE
+    GROUP BY account, transaction_ts::DATE
 
 ),
 
@@ -85,12 +78,7 @@ spine_bounds AS (
 
 calendar_spine AS (
 
-    SELECT
-        GENERATE_SERIES(
-            spine_start,
-            spine_end,
-            INTERVAL '1 day'
-        )::DATE AS snapshot_date
+    SELECT GENERATE_SERIES(spine_start, spine_end, INTERVAL '1 day')::DATE AS snapshot_date
     FROM spine_bounds
 
 ),
@@ -104,9 +92,7 @@ account_days AS (
         accounts.is_credit_account,
         calendar_spine.snapshot_date
     FROM accounts
-
     CROSS JOIN calendar_spine
-
     WHERE calendar_spine.snapshot_date >= accounts.balance_start_date
 
 ),
@@ -120,18 +106,12 @@ running_balance AS (
         account_days.is_credit_account,
         account_days.snapshot_date,
 
-        SUM(
-            COALESCE(
-                daily_transaction_totals.day_amount,
-                0
-            )
-        ) OVER (
+        SUM(COALESCE(daily_transaction_totals.day_amount, 0)) OVER (
             PARTITION BY account_days.account
             ORDER BY account_days.snapshot_date
         ) AS balance
 
     FROM account_days
-
     LEFT JOIN daily_transaction_totals
         ON
             daily_transaction_totals.account = account_days.account
@@ -155,7 +135,6 @@ periodized AS (
         running_balance.balance,
         period.period_grain,
         period.period
-
     FROM running_balance
 
     CROSS JOIN LATERAL (
@@ -228,13 +207,9 @@ period_snapshot AS (
         balance,
 
         ROW_NUMBER() OVER (
-            PARTITION BY
-                account,
-                period_grain,
-                period
+            PARTITION BY account, period_grain, period
             ORDER BY snapshot_date DESC
         ) AS rn
-
     FROM periodized
 
 ),
@@ -249,11 +224,9 @@ final AS (
         period,
         period_end,
         balance,
-
         period_end = MAX(period_end) OVER (
             PARTITION BY period_grain
         ) AS is_latest_period
-
     FROM period_snapshot
     WHERE rn = 1
 
@@ -261,8 +234,7 @@ final AS (
 
 target_currencies AS (
 
-    SELECT DISTINCT
-        base_currency AS target_currency
+    SELECT DISTINCT base_currency AS target_currency
     FROM {{ ref('core__exchange_rate') }}
 
     UNION
@@ -271,8 +243,7 @@ target_currencies AS (
 
     UNION
 
-    SELECT DISTINCT
-        currency
+    SELECT DISTINCT currency
     FROM {{ ref('core__fact_transaction') }}
 
 ),
@@ -291,56 +262,34 @@ converted AS (
         tc.target_currency,
 
         CASE
-            WHEN final.currency = tc.target_currency
-                THEN final.balance
-
-            WHEN final.currency = 'RUB'
-                THEN final.balance / NULLIF(target_fx.rate, 0)
-
-            WHEN tc.target_currency = 'RUB'
-                THEN final.balance * tx_fx.rate
-
-            ELSE
-                final.balance
-                * tx_fx.rate
-                / NULLIF(target_fx.rate, 0)
+            WHEN final.currency = tc.target_currency THEN final.balance
+            WHEN final.currency = 'RUB' THEN final.balance / NULLIF(target_fx.rate, 0)
+            WHEN tc.target_currency = 'RUB' THEN final.balance * tx_fx.rate
+            ELSE final.balance * tx_fx.rate / NULLIF(target_fx.rate, 0)
         END AS balance_converted
 
     FROM final
-
     CROSS JOIN target_currencies AS tc
 
     LEFT JOIN LATERAL (
-
-        SELECT
-            er.rate
+        SELECT er.rate
         FROM {{ ref('core__exchange_rate') }} AS er
         WHERE
             er.base_currency = final.currency
             AND er.rate_date <= final.period_end
         ORDER BY er.rate_date DESC
         LIMIT 1
-
-    ) AS tx_fx
-        ON
-            final.currency <> 'RUB'
-            AND final.currency <> tc.target_currency
+    ) AS tx_fx ON final.currency <> 'RUB' AND final.currency <> tc.target_currency
 
     LEFT JOIN LATERAL (
-
-        SELECT
-            er.rate
+        SELECT er.rate
         FROM {{ ref('core__exchange_rate') }} AS er
         WHERE
             er.base_currency = tc.target_currency
             AND er.rate_date <= final.period_end
         ORDER BY er.rate_date DESC
         LIMIT 1
-
-    ) AS target_fx
-        ON
-            tc.target_currency <> 'RUB'
-            AND final.currency <> tc.target_currency
+    ) AS target_fx ON tc.target_currency <> 'RUB' AND final.currency <> tc.target_currency
 
 )
 
