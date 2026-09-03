@@ -136,6 +136,10 @@ models:
       a snapshot generated even for periods without transactions via a
       daily calendar spine. Larger grains are independently computed
       end-of-period states, not sums of smaller-grain snapshots.
+      Rows belonging to the latest available snapshot within each
+      period_grain are marked with is_latest_period, allowing current-state
+      dashboard charts to select the latest materialized data without
+      relying on relative calendar filters.
 
     tests:
       - unique_combination_of_columns:
@@ -187,8 +191,19 @@ models:
         description: >
           Calendar date the snapshot represents: the latest spine day
           within the period. Equal to the calendar end of the period for
-          completed periods, or to the current date for the still
-          in-progress period.
+          completed periods, or to the current date at model build time
+          for the still in-progress period.
+        tests:
+          - not_null
+
+      - name: is_latest_period
+        description: >
+          Indicates whether period_end is the latest available snapshot date
+          within the corresponding period_grain in the materialized mart.
+          Multiple rows can be TRUE because all accounts and target currencies
+          belonging to the latest period are marked. Intended for current-state
+          dashboard charts that must use the latest available data regardless
+          of the current calendar date.
         tests:
           - not_null
 
